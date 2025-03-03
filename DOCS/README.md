@@ -37,22 +37,22 @@ Ce projet a pour objectif de démontrer la mise en place d’un système ERP com
 
 ## Structure du Projet
 
-## ODOO
+# ODOO
 - **`docker-compose.yml`** – Configuration Docker pour Odoo et PostgreSQL  
 - Autres scripts et configurations spécifiques à Odoo
 
-## DESKTOP_TKINTER
+# DESKTOP_TKINTER
 - **`main.py`** – Application principale développée avec Tkinter  
 - **`odoo_interface.py`** – Interface XML-RPC pour communiquer avec Odoo  
 - **`requirements.txt`** – Liste des dépendances Python (ex : Pillow)  
 - Ressources graphiques, icônes, etc.
 
-## DOCS
+# DOCS
 - **`planning_gantt.md`** – Planning et suivi du projet  
 - **`rapports.md`** – Documentation technique et rapports  
 - **`README.md`** – Documentation globale du projet
 
-## Autres fichiers
+# Autres fichiers
 - **`.gitignore`** – Fichier listant les fichiers et dossiers à ignorer par Git
 
 
