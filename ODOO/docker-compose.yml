@@ -1,3 +1,4 @@
+# ODOO/docker-compose.yml
 version: '3'
 services:
   db:
@@ -17,11 +18,11 @@ services:
     depends_on:
       - db
     ports:
-      - "8069:8069"  # Le port externe (8069) est mappé sur le port interne utilisé par Odoo
+      - "8069:8069"  # Le port interne 8069 d'Odoo est accessible sur le port 8069 de l'hôte.
     environment:
       - HOST=db
       - USER=odoo
       - PASSWORD=odoo
     volumes:
-      - ./addons:/mnt/extra-addons  # Optionnel : pour ajouter des modules personnalisés
+      - ./addons:/mnt/extra-addons  # Pour ajouter des modules personnalisés, si besoin.
     restart: always
