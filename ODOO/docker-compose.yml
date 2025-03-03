@@ -19,7 +19,7 @@ services:
     depends_on:
       - db
     ports:
-      - "8027:8069"  # Exemple : 8027 sur l'hôte, 8069 dans le conteneur
+      - "8027:8069"  
     environment:
       - HOST=db
       - USER=odoo
