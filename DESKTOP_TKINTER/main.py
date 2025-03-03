@@ -1,124 +1,197 @@
-
 #!/usr/bin/env python3
-"""
-Application Desktop ERP avec Tkinter.
-
-Cette application permet de :
-- Se connecter à un serveur Odoo via l'interface IF_Odoo.
-- Afficher et mettre à jour la quantité produite d'un ordre de fabrication.
-- Charger et afficher l'image d'un produit.
-"""
-
 import tkinter as tk
 from tkinter import ttk, messagebox
-import datetime as dt
 from PIL import Image, ImageTk
 from odoo_interface import IF_Odoo
 
 class App(tk.Tk):
     def __init__(self, odoo_interface):
         super().__init__()
-        self.title("ERP Desktop Application")
-        self.geometry("800x600")
+        self.title("ERP Odoo - Opérateur Production")
+        self.geometry("900x600")
+
         self.odoo = odoo_interface
-        self.create_widgets()
-        self.update_status()  # Lance la mise à jour périodique de la barre de status
+        self.connected = False
 
-    def create_widgets(self):
-        # Cadre pour la connexion et les contrôles Odoo
-        self.frmOdoo = ttk.Frame(self)
-        self.frmOdoo.pack(padx=10, pady=10, fill=tk.X)
+        # Barre de menu
+        menubar = tk.Menu(self)
+        self.config(menu=menubar)
 
-        # Bouton de connexion
-        self.btnConnect = ttk.Button(self.frmOdoo, text="Connect to Odoo", command=self.on_connect)
-        self.btnConnect.pack(side=tk.LEFT, padx=5)
+        # Menu Connexion (F1)
+        menu_conn = tk.Menu(menubar, tearoff=0)
+        menu_conn.add_command(label="Se connecter (F1)", command=self.f1_connect)
+        menubar.add_cascade(label="Connexion", menu=menu_conn)
 
-        # Spinbox pour sélectionner l'ID d'un ordre de fabrication
-        self.lblMo = ttk.Label(self.frmOdoo, text="MO ID:")
-        self.lblMo.pack(side=tk.LEFT, padx=5)
-        self.sbxMoId = ttk.Spinbox(self.frmOdoo, from_=1, to=100)
-        self.sbxMoId.set(1)
-        self.sbxMoId.pack(side=tk.LEFT, padx=5)
+        # Menu Entreprise (F2)
+        menu_company = tk.Menu(menubar, tearoff=0)
+        menu_company.add_command(label="Voir fiche entreprise (F2)", command=self.f2_show_company)
+        menubar.add_cascade(label="Entreprise", menu=menu_company)
 
-        # Bouton pour augmenter la production
-        self.btnProducing = ttk.Button(self.frmOdoo, text="Produce", command=self.on_producing)
-        self.btnProducing.pack(side=tk.LEFT, padx=5)
+        # Menu Produits (F3)
+        menu_product = tk.Menu(menubar, tearoff=0)
+        menu_product.add_command(label="Liste des produits (F3)", command=self.f3_show_products)
+        menubar.add_cascade(label="Produits", menu=menu_product)
 
-        # Bouton pour charger et afficher l'image d'un produit (exemple : produit avec id 1)
-        self.btnLoadImage = ttk.Button(self.frmOdoo, text="Load Product Image", command=self.on_load_image)
-        self.btnLoadImage.pack(side=tk.LEFT, padx=5)
+        # Menu OF (F4 & F5)
+        menu_of = tk.Menu(menubar, tearoff=0)
+        menu_of.add_command(label="Liste des OF (F4)", command=self.f4_show_of)
+        menu_of.add_command(label="Modifier qty produite (F5)", command=self.f5_update_mo_qty)
+        menubar.add_cascade(label="Ordres Fabrication", menu=menu_of)
 
-        # Barre de status en bas de la fenêtre
-        self.lblStatus = ttk.Label(self, text="Status: Not connected", relief=tk.SUNKEN, anchor=tk.W)
-        self.lblStatus.pack(side=tk.BOTTOM, fill=tk.X)
+        # Cadre principal
+        self.main_frame = ttk.Frame(self)
+        self.main_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Zone d'affichage de l'image du produit
-        self.lblImage = ttk.Label(self)
-        self.lblImage.pack(pady=10)
+        # Label de statut en bas
+        self.status_label = ttk.Label(self, text="Statut : non connecté", relief=tk.SUNKEN, anchor=tk.W)
+        self.status_label.pack(side=tk.BOTTOM, fill=tk.X)
 
-    def on_connect(self):
-        # Tentative de connexion à Odoo
-        self.lblStatus.config(text="Connecting to Odoo...")
-        self.update()  # Rafraîchit l'interface
+    # F1 : Connexion
+    def f1_connect(self):
         if self.odoo.connect():
-            messagebox.showinfo("Connection", f"Connected to Odoo version {self.odoo.odoo_version}")
-            self.lblStatus.config(text=f"Connected to Odoo version {self.odoo.odoo_version}")
+            self.connected = True
+            messagebox.showinfo("Connexion", f"Connecté à Odoo (version: {self.odoo.odoo_version})")
+            self.status_label.config(text=f"Statut : Connecté à Odoo v{self.odoo.odoo_version}")
         else:
-            messagebox.showerror("Connection Error", "Failed to connect to Odoo")
-            self.lblStatus.config(text="Connection failed.")
+            self.connected = False
+            messagebox.showerror("Erreur", "Échec de la connexion à Odoo")
+            self.status_label.config(text="Statut : non connecté")
 
-    def on_producing(self):
-        # Récupère l'ID de l'ordre de fabrication depuis la spinbox
-        mo_id = self.sbxMoId.get()
+    # F2 : Fiche entreprise
+    def f2_show_company(self):
+        if not self.connected:
+            messagebox.showwarning("Attention", "Veuillez d'abord vous connecter (F1).")
+            return
+        company = self.odoo.get_company_info()
+        if company:
+            info = f"Nom: {company.get('name', '')}\n" \
+                   f"Adresse: {company.get('street', '')}\n" \
+                   f"Ville: {company.get('city', '')}\n" \
+                   f"Téléphone: {company.get('phone', '')}"
+            messagebox.showinfo("Fiche Entreprise", info)
+        else:
+            messagebox.showerror("Erreur", "Impossible de récupérer la fiche entreprise.")
+
+    # F3 : Liste des produits
+    def f3_show_products(self):
+        if not self.connected:
+            messagebox.showwarning("Attention", "Veuillez d'abord vous connecter (F1).")
+            return
+        products = self.odoo.get_products()
+        if not products:
+            messagebox.showinfo("Info", "Aucun produit trouvé.")
+            return
+
+        # On vide le main_frame
+        for widget in self.main_frame.winfo_children():
+            widget.destroy()
+
+        lbl = ttk.Label(self.main_frame, text="Liste des produits (F3)", font=("Arial", 16))
+        lbl.pack(pady=10)
+
+        # Affichage sous forme de tableau
+        tree = ttk.Treeview(self.main_frame, columns=("price", "img"), show="headings", height=15)
+        tree.heading("price", text="Prix")
+        tree.heading("img", text="Image (aperçu)")
+        tree.column("price", width=100)
+        tree.column("img", width=200)
+        tree.pack(fill=tk.BOTH, expand=True)
+
+        for prod in products:
+            name = prod.get("name", "")
+            price = prod.get("list_price", 0.0)
+            tree.insert("", tk.END, values=(price, f"{name}"))
+
+        # Si on voulait afficher des images, on pourrait stocker PhotoImage dans un dictionnaire,
+        # puis sur clic, ouvrir une nouvelle fenêtre avec l'image décodée.
+
+    # F4 : Liste OF
+    def f4_show_of(self):
+        if not self.connected:
+            messagebox.showwarning("Attention", "Veuillez d'abord vous connecter (F1).")
+            return
+
+        # On demande éventuellement un état
+        state = self.ask_of_state()
+        orders = self.odoo.get_manufacturing_orders(state_filter=state)
+
+        # On vide le main_frame
+        for widget in self.main_frame.winfo_children():
+            widget.destroy()
+
+        lbl = ttk.Label(self.main_frame, text="Liste des Ordres de Fabrication (F4)", font=("Arial", 16))
+        lbl.pack(pady=10)
+
+        tree = ttk.Treeview(self.main_frame, columns=("product", "qty", "producing", "state"), show="headings", height=15)
+        tree.heading("product", text="Produit")
+        tree.heading("qty", text="Qté demandée")
+        tree.heading("producing", text="Qté produite")
+        tree.heading("state", text="État")
+        tree.column("product", width=150)
+        tree.column("qty", width=100)
+        tree.column("producing", width=100)
+        tree.column("state", width=100)
+        tree.pack(fill=tk.BOTH, expand=True)
+
+        for of in orders:
+            name_of = of.get("name", "")
+            product_id = of.get("product_id", ["", ""])[1]  # le deuxième élément du champ Many2one
+            qty = of.get("product_qty", 0.0)
+            producing = of.get("qty_producing", 0.0)
+            state_of = of.get("state", "")
+            tree.insert("", tk.END, values=(product_id, qty, producing, state_of))
+
+    # F5 : Modifier la quantité produite d’un OF
+    def f5_update_mo_qty(self):
+        if not self.connected:
+            messagebox.showwarning("Attention", "Veuillez d'abord vous connecter (F1).")
+            return
+
+        # Demande l'ID de l'OF
+        mo_id_str = tk.simpledialog.askstring("Modifier OF", "Entrez l'ID de l'OF :")
+        if not mo_id_str:
+            return
         try:
-            mo_id_int = int(mo_id)
+            mo_id = int(mo_id_str)
         except ValueError:
-            messagebox.showerror("Error", "Invalid MO ID")
+            messagebox.showerror("Erreur", "ID invalide.")
             return
 
-        qty_product = self.odoo.get_manuf_order_qty_to_product(mo_id_int)
-        qty_producing = self.odoo.get_manuf_order_qty_producing(mo_id_int)
-
-        if qty_product == -1 or qty_producing == -1:
-            messagebox.showerror("Error", "Manufacturing order not found")
+        new_qty_str = tk.simpledialog.askstring("Modifier OF", "Nouvelle quantité produite :")
+        if not new_qty_str:
+            return
+        try:
+            new_qty = float(new_qty_str)
+        except ValueError:
+            messagebox.showerror("Erreur", "Quantité invalide.")
             return
 
-        if qty_producing < qty_product:
-            new_qty = qty_producing + 1
-            if self.odoo.set_manuf_order_qty_producing(mo_id_int, new_qty):
-                self.lblStatus.config(text=f"MO {mo_id_int}: Producing Qty updated to {new_qty} / {qty_product}")
-            else:
-                messagebox.showerror("Error", "Failed to update producing quantity")
+        ok = self.odoo.update_mo_quantity(mo_id, new_qty)
+        if ok:
+            messagebox.showinfo("Succès", f"Quantité produite mise à jour pour l'OF {mo_id}.")
         else:
-            messagebox.showinfo("Info", "Production already complete for this order.")
+            messagebox.showerror("Erreur", f"Impossible de mettre à jour l'OF {mo_id}.")
 
-    def on_load_image(self):
-        # Exemple : charger l'image du produit avec id 1
-        product_id = 1
-        image_filename = "product_1.png"
-        if self.odoo.save_product_image(product_id, image_filename):
-            try:
-                img = Image.open(image_filename)
-                img = img.resize((200, 200))
-                photo = ImageTk.PhotoImage(img)
-                self.lblImage.config(image=photo)
-                self.lblImage.image = photo  # Conserver la référence
-                self.lblStatus.config(text="Product image loaded successfully.")
-            except Exception as e:
-                messagebox.showerror("Image Error", f"Error displaying image: {e}")
-        else:
-            messagebox.showerror("Image Error", "Failed to load product image.")
+        # (Optionnel) Si vous voulez passer l'OF à 'done' quand la qty produite atteint la qty demandée,
+        # vous pouvez appeler self.odoo.set_mo_done(mo_id) selon la logique.
 
-    def update_status(self):
-        # Mise à jour périodique de la barre de status avec l'heure et la version d'Odoo
-        now = dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-        version = self.odoo.odoo_version if self.odoo.odoo_version else "Not connected"
-        self.lblStatus.config(text=f"{now} - Odoo Version: {version}")
-        self.after(5000, self.update_status)  # Rafraîchit toutes les 5 secondes
+    def ask_of_state(self):
+        """
+        Petite boîte de dialogue pour demander l'état (confirmed, progress, done, cancel).
+        """
+        state = tk.simpledialog.askstring("Filtrer OF", "État de l'OF (confirmed, progress, done, cancel) ?\nLaisser vide pour tous.")
+        return state
 
 if __name__ == "__main__":
-    # Instanciation de l'interface Odoo avec les paramètres de connexion
-    odoo_interface = IF_Odoo("192.168.0.17", "8069", "vitre", "inter", "inter")
+    # Exemple de configuration Odoo
+    # Adaptez host, port, db, user, pwd à votre environnement
+    odoo_interface = IF_Odoo(
+        host="172.31.10.137",
+        port="8027",
+        db="postgres",
+        user="odoo",
+        pwd="myodoo"
+    )
+
     app = App(odoo_interface)
     app.mainloop()
-
