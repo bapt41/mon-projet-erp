@@ -1,5 +1,4 @@
-# ODOO/docker-compose.yml
-version: '3'
+version: '2'
 services:
   db:
     image: postgres:13
@@ -11,18 +10,26 @@ services:
     volumes:
       - ./data/db:/var/lib/postgresql/data
     restart: always
+    networks:
+      - odoo_default
 
-  odoo:
+  web:
     image: odoo:15
     container_name: odoo_app
     depends_on:
       - db
     ports:
-      - "8069:8069"  # Le port interne 8069 d'Odoo est accessible sur le port 8069 de l'hôte.
+      - "8027:8069"  # Exemple : 8027 sur l'hôte, 8069 dans le conteneur
     environment:
       - HOST=db
       - USER=odoo
       - PASSWORD=odoo
     volumes:
-      - ./addons:/mnt/extra-addons  # Pour ajouter des modules personnalisés, si besoin.
+      - ./addons:/mnt/extra-addons
     restart: always
+    networks:
+      - odoo_default
+
+networks:
+  odoo_default:
+    external: true
