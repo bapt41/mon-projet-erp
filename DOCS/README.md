@@ -36,8 +36,24 @@ Ce projet a pour objectif de démontrer la mise en place d’un système ERP com
   - Une barre de status affichant la version d’Odoo, l’heure et l’état de l’OF.
 
 ## Structure du Projet
-Le repository est organisé de la manière suivante :
-. ├── ODOO/ │ ├── docker-compose.yml # Configuration Docker pour Odoo et PostgreSQL │ └── (autres scripts et configurations liés à Odoo) ├── DESKTOP_TKINTER/ │ ├── main.py # Application Tkinter principale │ ├── odoo_interface.py # Interface Python pour communiquer avec Odoo via XML-RPC │ ├── requirements.txt # Liste des dépendances Python (ex: Pillow) │ └── (ressources graphiques, icônes, etc.) ├── DOCS/ │ ├── planning_gantt.md # Planning et suivi du projet │ ├── rapports.md # Rapports et documentation technique │ └── README.md # Ce fichier (documentation globale) └── .gitignore # Fichier pour ignorer certains fichiers/dossiers
+
+### ODOO
+- **`docker-compose.yml`** – Configuration Docker pour Odoo et PostgreSQL  
+- Autres scripts et configurations spécifiques à Odoo
+
+### DESKTOP_TKINTER
+- **`main.py`** – Application principale développée avec Tkinter  
+- **`odoo_interface.py`** – Interface XML-RPC pour communiquer avec Odoo  
+- **`requirements.txt`** – Liste des dépendances Python (ex : Pillow)  
+- Ressources graphiques, icônes, etc.
+
+### DOCS
+- **`planning_gantt.md`** – Planning et suivi du projet  
+- **`rapports.md`** – Documentation technique et rapports  
+- **`README.md`** – Documentation globale du projet
+
+### Autres fichiers
+- **`.gitignore`** – Fichier listant les fichiers et dossiers à ignorer par Git
 
 
 ## Prérequis
