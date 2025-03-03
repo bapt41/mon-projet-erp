@@ -1,17 +1,16 @@
 version: '2'
+
 services:
   db:
     image: postgres:13
     container_name: odoo_db
     environment:
-      POSTGRES_DB: odoo
-      POSTGRES_USER: odoo
-      POSTGRES_PASSWORD: odoo
+      - POSTGRES_DB=odoo
+      - POSTGRES_USER=odoo
+      - POSTGRES_PASSWORD=myodoo
     volumes:
       - ./data/db:/var/lib/postgresql/data
     restart: always
-    networks:
-      - odoo_default
 
   web:
     image: odoo:15
@@ -19,17 +18,11 @@ services:
     depends_on:
       - db
     ports:
-      - "8027:8069"  
+      - "8027:8069"
     environment:
       - HOST=db
       - USER=odoo
-      - PASSWORD=odoo
+      - PASSWORD=myodoo
     volumes:
       - ./addons:/mnt/extra-addons
     restart: always
-    networks:
-      - odoo_default
-
-networks:
-  odoo_default:
-    external: true
