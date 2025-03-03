@@ -1,1 +1,27 @@
+version: '3'
+services:
+  db:
+    image: postgres:13
+    container_name: odoo_db
+    environment:
+      POSTGRES_DB: odoo
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: odoo
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+    restart: always
 
+  odoo:
+    image: odoo:15
+    container_name: odoo_app
+    depends_on:
+      - db
+    ports:
+      - "8069:8069"  # Le port externe (8069) est mappé sur le port interne utilisé par Odoo
+    environment:
+      - HOST=db
+      - USER=odoo
+      - PASSWORD=odoo
+    volumes:
+      - ./addons:/mnt/extra-addons  # Optionnel : pour ajouter des modules personnalisés
+    restart: always
