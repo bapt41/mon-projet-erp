@@ -3,72 +3,76 @@ import xmlrpc.client
 import base64
 
 class IF_Odoo:
+    """
+    Classe d'interface Python <-> Odoo via l'API XML-RPC.
+    """
+
     def __init__(self, host, port, db, user, pwd):
         """
-        host: ex. "172.31.10.137"
-        port: ex. "8027"
-        db: nom de la base (ex. "odoo")
-        user: nom d'utilisateur (ex. "admin")
-        pwd: mot de passe (ex. "admin")
+        Paramètres de connexion à Odoo.
+        :param host: ex. "localhost" ou "172.31.10.137"
+        :param port: ex. "8069"
+        :param db:   nom de la base Odoo, ex. "demo"
+        :param user: utilisateur Odoo (login)
+        :param pwd:  mot de passe Odoo
         """
         self.host = host
         self.port = port
-        self.db = db
+        self.db   = db
         self.user = user
-        self.pwd = pwd
-        self.url = f"http://{host}:{port}"
-        self.uid = None
-        self.odoo_version = None
-        self.models = None
+        self.pwd  = pwd
+
+        self.uid    = None  # sera attribué après connect()
+        self.models = None  # proxy vers /xmlrpc/2/object
 
     def connect(self):
         """
-        Connexion à Odoo via XML-RPC. Retourne True si OK, False sinon.
+        F1 : Tentative de connexion à Odoo via XML-RPC.
+        Retourne True si OK, False sinon.
         """
         try:
-            common = xmlrpc.client.ServerProxy(f"{self.url}/xmlrpc/2/common")
+            url = f"http://{self.host}:{self.port}"
+            common = xmlrpc.client.ServerProxy(f"{url}/xmlrpc/2/common")
+
             self.uid = common.authenticate(self.db, self.user, self.pwd, {})
             if not self.uid:
-                print("Échec de l'authentification Odoo")
+                # Echec d'authentification
                 return False
-            self.odoo_version = common.version().get("server_serie", "Unknown")
-            self.models = xmlrpc.client.ServerProxy(f"{self.url}/xmlrpc/2/object")
-            print(f"Connecté à Odoo, version: {self.odoo_version}")
+
+            # On récupère le proxy vers /xmlrpc/2/object
+            self.models = xmlrpc.client.ServerProxy(f"{url}/xmlrpc/2/object")
             return True
         except Exception as e:
-            print("Erreur de connexion:", e)
+            print(f"[IF_Odoo] Erreur de connexion : {e}")
             return False
 
-    # F2 : Fiche entreprise
     def get_company_info(self):
         """
-        Récupère la fiche de la société principale (res.company).
-        Retourne un dict avec les champs intéressants (name, street, etc.)
+        F2 : Récupère la fiche de la société principale (res.company).
+        Retourne un dict : {'name':..., 'street':..., 'city':..., 'phone':...} ou {} si non trouvé.
         """
         if not self.models:
             return {}
         try:
-            # On suppose que l'ID de la compagnie principale est 1
-            # ou on recherche la première via search_read
-            companies = self.models.execute_kw(
+            comps = self.models.execute_kw(
                 self.db, self.uid, self.pwd,
                 'res.company', 'search_read',
-                [[('id', '>', 0)]],  # ou [()] si vous voulez la première
+                [[]],  # tout
                 {'fields': ['name', 'street', 'city', 'phone'], 'limit': 1}
             )
-            if companies:
-                return companies[0]
-            else:
-                return {}
+            return comps[0] if comps else {}
         except Exception as e:
-            print("Erreur get_company_info:", e)
+            print(f"[IF_Odoo] Erreur get_company_info : {e}")
             return {}
 
-    # F3 : Liste des produits (avec image)
     def get_products(self):
         """
-        Retourne la liste des produits (product.template) avec
-        'name', 'list_price', 'image_1920' (image binaire).
+        F3 : Récupère la liste des produits (product.template).
+        Retourne une liste de dict, ex. :
+        [
+          {'id':..., 'name':..., 'list_price':..., 'image_1920':...},
+          ...
+        ]
         """
         if not self.models:
             return []
@@ -76,19 +80,19 @@ class IF_Odoo:
             products = self.models.execute_kw(
                 self.db, self.uid, self.pwd,
                 'product.template', 'search_read',
-                [[]],  # Tous les produits
+                [[]],
                 {'fields': ['name', 'list_price', 'image_1920'], 'limit': 50}
             )
             return products
         except Exception as e:
-            print("Erreur get_products:", e)
+            print(f"[IF_Odoo] Erreur get_products : {e}")
             return []
 
-    # F4 : Liste des OF
     def get_manufacturing_orders(self, state_filter=None):
         """
-        Retourne la liste des ordres de fabrication (mrp.production).
-        state_filter peut être 'confirmed', 'progress', 'done', 'cancel'
+        F4 : Récupère la liste des Ordres de Fabrication (mrp.production).
+        :param state_filter: ex. 'confirmed', 'progress', 'done', 'cancel' ou None
+        :return: liste de dict
         """
         if not self.models:
             return []
@@ -100,18 +104,19 @@ class IF_Odoo:
                 self.db, self.uid, self.pwd,
                 'mrp.production', 'search_read',
                 [domain],
-                {'fields': ['name', 'product_id', 'product_qty', 'qty_producing', 'state'], 'limit': 50}
+                {'fields': ['name', 'product_qty', 'qty_producing', 'state'], 'limit': 50}
             )
             return orders
         except Exception as e:
-            print("Erreur get_manufacturing_orders:", e)
+            print(f"[IF_Odoo] Erreur get_manufacturing_orders : {e}")
             return []
 
-    # F5 : Mettre à jour la quantité produite d'un OF
     def update_mo_quantity(self, mo_id, new_qty):
         """
-        Met à jour la qty_producing d'un ordre de fabrication (mrp.production).
-        Retourne True si OK, False sinon.
+        F5 : Met à jour la qty_producing d'un Ordre de Fab (mrp.production).
+        :param mo_id: l'ID de l'OF (entier)
+        :param new_qty: nouvelle quantité produite (float)
+        :return: True si OK, False sinon
         """
         if not self.models:
             return False
@@ -121,23 +126,39 @@ class IF_Odoo:
                 'mrp.production', 'write',
                 [[mo_id], {'qty_producing': new_qty}]
             )
-            return result
+            return result  # True ou False
         except Exception as e:
-            print("Erreur update_mo_quantity:", e)
+            print(f"[IF_Odoo] Erreur update_mo_quantity : {e}")
             return False
 
-    # Exemple pour passer un OF à l'état "done" (optionnel)
-    def set_mo_done(self, mo_id):
+    def save_product_image(self, product_id, image_filename):
         """
-        Appelle la méthode 'button_mark_done' sur l'OF (Odoo 15).
+        Optionnel : Récupère l'image binaire (image_1920) d'un product.template puis
+        la sauvegarde dans un fichier (image_filename).
         """
+        if not self.models:
+            return False
         try:
-            self.models.execute_kw(
+            products = self.models.execute_kw(
                 self.db, self.uid, self.pwd,
-                'mrp.production', 'button_mark_done',
-                [[mo_id]]
+                'product.template', 'search_read',
+                [[('id', '=', product_id)]],
+                {'fields': ['image_1920'], 'limit': 1}
             )
+            if not products:
+                return False
+            image_str = products[0].get('image_1920')
+            if not image_str:
+                return False
+
+            # On convertit la chaîne base64 en bytes
+            image_bytes = base64.b64decode(image_str)
+
+            # On sauvegarde dans un fichier .png
+            with open(image_filename, 'wb') as f:
+                f.write(image_bytes)
+
             return True
         except Exception as e:
-            print("Erreur set_mo_done:", e)
+            print(f"[IF_Odoo] Erreur save_product_image : {e}")
             return False
