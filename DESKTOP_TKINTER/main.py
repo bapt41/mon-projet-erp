@@ -28,7 +28,7 @@ class LoginPage:
         img_dir    = os.path.join(script_dir, "images")
 
         bg_path       = os.path.join(img_dir, "background1.png")
-        vector_path   = os.path.join(img_dir, "vector.png")
+        vector_path   = os.path.join(img_dir, "Logo BikeLab_V2.png")
         hyy_path      = os.path.join(img_dir, "hyy.png")
         user_ico      = os.path.join(img_dir, "username_icon.png")
         pass_ico      = os.path.join(img_dir, "password_icon.png")
@@ -342,10 +342,11 @@ class HomePage(tk.Frame):
     Affiche plusieurs indicateurs récupérés depuis Odoo :
       - Date du jour
       - Utilisateur connecté
-      - Informations sur l'entreprise (si disponibles)
+      - Informations sur l'entreprise (nom)
       - Nombre de commandes clients
       - Nombre de produits
       - Nombre d'OF en cours
+      - Tâches récentes (récupérées depuis Odoo)
     """
     def __init__(self, parent, app):
         super().__init__(parent, bg="#10142c")
@@ -354,11 +355,9 @@ class HomePage(tk.Frame):
         # 1) Barre de titre avec la date
         title_frame = tk.Frame(self, bg="#10142c")
         title_frame.pack(fill="x", pady=10)
-
         tk.Label(title_frame, text="Tableau de bord d'entreprise",
                  bg="#10142c", fg="white", font=("Arial", 24, "bold")
         ).pack(side="left", padx=20)
-
         import datetime
         now = datetime.datetime.now()
         date_str = now.strftime("%d/%m/%Y")
@@ -367,7 +366,6 @@ class HomePage(tk.Frame):
         ).pack(side="right", padx=20)
 
         # 2) Infos sur l'utilisateur
-        # On suppose que le login (IF_Odoo.user) contient le nom de l'utilisateur.
         user_name = self.app.odoo.user or "Utilisateur"
         user_frame = tk.Frame(self, bg="#1b1f3b")
         user_frame.pack(fill="x", padx=20, pady=(0, 10))
@@ -379,12 +377,9 @@ class HomePage(tk.Frame):
         kpi_frame = tk.Frame(self, bg="#10142c")
         kpi_frame.pack(fill="x", padx=20, pady=10)
 
-        # KPI : Fiche Entreprise
+        # KPI : Fiche Entreprise (nom de l'entreprise)
         company_info = self.app.odoo.get_company_info()
-        if company_info:
-            company_text = company_info.get("name", "N/A")
-        else:
-            company_text = "Non disponible"
+        company_text = company_info.get("name", "Non disponible") if company_info else "Non disponible"
         self.create_kpi_card(kpi_frame, "Entreprise", company_text, "#eb53a2").pack(side="left", expand=True, fill="both", padx=5)
 
         # KPI : Nombre de commandes clients
@@ -396,40 +391,36 @@ class HomePage(tk.Frame):
         product_count = len(products)
         self.create_kpi_card(kpi_frame, "Produits", f"{product_count}", "#3aaed8").pack(side="left", expand=True, fill="both", padx=5)
 
-        # KPI : Nombre d'OF en cours
-        # Ici, on suppose que l'état "progress" représente les OF en cours.
+        # KPI : Nombre d'OF en cours (filtre sur l'état "progress")
         of_in_progress = self.app.odoo.get_manufacturing_orders(state_filter="progress")
         of_count = len(of_in_progress)
         self.create_kpi_card(kpi_frame, "OF en cours", f"{of_count}", "#9263f9").pack(side="left", expand=True, fill="both", padx=5)
 
-        # 4) Section Complémentaire (Quick Links / Dernières Tâches)
+        # 4) Section Tâches récentes récupérées depuis Odoo
         bottom_frame = tk.Frame(self, bg="#10142c")
         bottom_frame.pack(fill="both", expand=True, padx=20, pady=(10,20))
-
-        # Quick Links
-        quick_links_frame = tk.Frame(bottom_frame, bg="#1b1f3b")
-        quick_links_frame.pack(side="left", fill="y", padx=5, pady=5)
-        tk.Label(quick_links_frame, text="Quick Links", bg="#1b1f3b", fg="white",
-                 font=("Arial", 14, "bold")).pack(pady=10, padx=10)
-        links = ["Créer un produit", "Lister OF en cours", "Gérer la facturation", "Rapport des ventes"]
-        for link in links:
-            tk.Button(quick_links_frame, text=link, bg="#3047ff", fg="white",
-                      font=("Arial", 10), bd=0, padx=10, pady=5).pack(pady=5, padx=10, fill="x")
-
-        # Tâches récentes (exemple fictif)
         tasks_frame = tk.Frame(bottom_frame, bg="#1b1f3b")
         tasks_frame.pack(side="right", expand=True, fill="both", padx=5, pady=5)
         tk.Label(tasks_frame, text="Tâches récentes", bg="#1b1f3b", fg="white",
                  font=("Arial", 14, "bold")).pack(pady=10, padx=10)
-        tasks = [
-            "OF #1002: Production en cours",
-            "Commande #SO1001: à livrer",
-            "Inventaire mensuel",
-            "Formation opérateurs",
-        ]
-        for task in tasks:
-            tk.Label(tasks_frame, text=f"• {task}", bg="#1b1f3b", fg="white",
-                     font=("Arial", 12)).pack(anchor="w", padx=20, pady=2)
+        
+        # Récupération des tâches récentes depuis Odoo
+        recent_tasks = self.app.odoo.get_recent_tasks(limit=5)
+        if recent_tasks:
+            for task in recent_tasks:
+                # Extraction des champs
+                task_name = task.get("name", "Sans nom")
+                deadline = task.get("date_deadline", "Aucune date")
+                user_info = task.get("user_id", [None, "Non assigné"])
+                stage_info = task.get("stage_id", [None, ""])
+                user_assigned = user_info[1] if isinstance(user_info, list) and len(user_info) == 2 else "Non assigné"
+                stage_name = stage_info[1] if isinstance(stage_info, list) and len(stage_info) == 2 else ""
+                task_text = f"• {task_name} | Deadline: {deadline} | Assigné à: {user_assigned} | Étape: {stage_name}"
+                tk.Label(tasks_frame, text=task_text, bg="#1b1f3b", fg="white",
+                         font=("Arial", 12)).pack(anchor="w", padx=20, pady=2)
+        else:
+            tk.Label(tasks_frame, text="Aucune tâche récente trouvée", bg="#1b1f3b", fg="white",
+                     font=("Arial", 12)).pack(pady=10, padx=10)
 
     def create_kpi_card(self, parent, title, value, color):
         """
@@ -597,7 +588,7 @@ class ProductsPage(tk.Frame):
 
 
 class OrdersPage(tk.Frame):
-    """ F4 : Afficher la liste des Ordres de Fab, avec un éventuel filtre d'état. """
+    """ F4 : Afficher la liste des Ordres de Fabrication filtrables par état. """
     def __init__(self, parent, app):
         super().__init__(parent, bg="#10142c")
         self.app = app
@@ -606,14 +597,24 @@ class OrdersPage(tk.Frame):
                  font=("Arial", 18, "bold")).pack(pady=20)
 
         filter_frame = tk.Frame(self, bg="#10142c")
-        filter_frame.pack()
+        filter_frame.pack(pady=10)
 
         tk.Label(filter_frame, text="État OF :", bg="#10142c", fg="white",
                  font=("Arial", 12)).pack(side="left", padx=5)
 
-        self.filter_var = tk.StringVar()
-        filter_entry = tk.Entry(filter_frame, textvariable=self.filter_var)
-        filter_entry.pack(side="left", padx=5)
+        # Dictionnaire de correspondance pour le filtre (libellés en français)
+        self.state_options = {
+            "Tout": "all",
+            "Confirmé": "confirmed",
+            "En cours": "progress",
+            "Fait": "done",
+            "Annulé": "cancel"
+        }
+        self.selected_state = tk.StringVar()
+        self.selected_state.set("Tout")
+        state_menu = tk.OptionMenu(filter_frame, self.selected_state, *self.state_options.keys())
+        state_menu.config(font=("Arial", 12))
+        state_menu.pack(side="left", padx=5)
 
         btn_load = tk.Button(filter_frame, text="Charger OF", bg="#3047ff", fg="white",
                              font=("Arial", 12), command=self.show_of)
@@ -634,26 +635,35 @@ class OrdersPage(tk.Frame):
         self.tree.column("state", width=100)
         self.tree.pack(fill="both", expand=True)
 
+        # Dictionnaire pour traduire les codes d'état en libellés français
+        self.state_labels = {
+            "confirmed": "Confirmé",
+            "progress": "En cours",
+            "done": "Fait",
+            "cancel": "Annulé"
+        }
+
     def show_of(self):
+        # Vider le Treeview
         for row in self.tree.get_children():
             self.tree.delete(row)
-
-        state = self.filter_var.get().strip()
-        if state:
-            orders = self.app.odoo.get_manufacturing_orders(state_filter=state)
-        else:
-            orders = self.app.odoo.get_manufacturing_orders()
-
+        # Obtenir l'état sélectionné et sa valeur Odoo correspondante
+        state_label = self.selected_state.get()  # ex: "Tout", "Confirmé", etc.
+        state_value = self.state_options.get(state_label)  # ex: "all", "confirmed", etc.
+        orders = self.app.odoo.get_manufacturing_orders(state_filter=state_value)
         if not orders:
             messagebox.showinfo("OF", "Aucun ordre trouvé.")
             return
-
         for of in orders:
-            name_of   = of.get("name", "")
-            qty       = of.get("product_qty", 0.0)
-            produced  = of.get("qty_producing", 0.0)
-            state_of  = of.get("state", "")
-            self.tree.insert("", tk.END, values=(name_of, qty, produced, state_of))
+            name_of = of.get("name", "")
+            qty = of.get("product_qty", 0.0)
+            produced = of.get("qty_producing", 0.0)
+            state_of = of.get("state", "")
+            # Traduire le code d'état en libellé français
+            display_state = self.state_labels.get(state_of, state_of)
+            self.tree.insert("", tk.END, values=(name_of, qty, produced, display_state))
+
+
 
 
 class UpdateQtyPage(tk.Frame):
