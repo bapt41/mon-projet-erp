@@ -165,11 +165,9 @@ class IF_Odoo:
 
     def get_recent_tasks(self, limit=5):
         """
-        Récupère les tâches récentes (project.task) depuis Odoo.
-        Retourne une liste de dictionnaires contenant les champs
-        'name', 'date_deadline', 'user_id' et 'stage_id'.
-        Les tâches sont triées par date de création décroissante.
-        :param limit: Nombre maximum de tâches à récupérer.
+        Récupère les tâches récentes depuis Odoo.
+        Retourne une liste de dictionnaires contenant les champs 'name', 'date_deadline', 'user_id' et 'stage_id'.
+        Si le modèle project.task n'existe pas, renvoie une liste vide.
         """
         if not self.models:
             return []
@@ -188,6 +186,7 @@ class IF_Odoo:
         except Exception as e:
             print(f"[IF_Odoo] Erreur get_recent_tasks : {e}")
             return []
+
 
     def save_product_image(self, product_id, image_filename):
         """
