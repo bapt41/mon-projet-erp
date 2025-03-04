@@ -3,88 +3,8 @@ import os
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 from PIL import Image, ImageTk
-import xmlrpc.client
-
-
-##############################################################################
-#                           IF_Odoo (API Odoo)                               #
-##############################################################################
-class IF_Odoo:
-    def __init__(self, host, port, db, user, pwd):
-        self.host = host
-        self.port = port
-        self.db   = db
-        self.user = user
-        self.pwd  = pwd
-        self.uid  = None
-        self.models = None
-
-    def connect(self):
-        """Connexion via XML-RPC. Retourne True si OK, False sinon."""
-        try:
-            url = f"http://{self.host}:{self.port}"
-            common = xmlrpc.client.ServerProxy(f"{url}/xmlrpc/2/common")
-            self.uid = common.authenticate(self.db, self.user, self.pwd, {})
-            if not self.uid:
-                return False
-            self.models = xmlrpc.client.ServerProxy(f"{url}/xmlrpc/2/object")
-            return True
-        except:
-            return False
-
-    # F2 : fiche de l’entreprise
-    def get_company_info(self):
-        if not self.models:
-            return {}
-        comps = self.models.execute_kw(
-            self.db, self.uid, self.pwd,
-            'res.company', 'search_read',
-            [[]],
-            {'fields': ['name', 'street', 'city', 'phone'], 'limit': 1}
-        )
-        return comps[0] if comps else {}
-
-    # F3 : liste des produits
-    def get_products(self):
-        if not self.models:
-            return []
-        products = self.models.execute_kw(
-            self.db, self.uid, self.pwd,
-            'product.template', 'search_read',
-            [[]],
-            {'fields': ['name', 'list_price', 'image_1920'], 'limit': 50}
-        )
-        return products
-
-    # F4 : liste des OF
-    def get_manufacturing_orders(self, state_filter=None):
-        if not self.models:
-            return []
-        domain = []
-        if state_filter:
-            domain = [('state', '=', state_filter)]
-        orders = self.models.execute_kw(
-            self.db, self.uid, self.pwd,
-            'mrp.production', 'search_read',
-            [domain],
-            {'fields': ['name', 'product_qty', 'qty_producing', 'state'], 'limit': 50}
-        )
-        return orders
-
-    # F5 : modifier la quantité produite
-    def update_mo_quantity(self, mo_id, new_qty):
-        if not self.models:
-            return False
-        try:
-            result = self.models.execute_kw(
-                self.db, self.uid, self.pwd,
-                'mrp.production', 'write',
-                [[mo_id], {'qty_producing': new_qty}]
-            )
-            return result
-        except:
-            return False
-
+# Import de la classe IF_Odoo
+from odoo_interface import IF_Odoo
 
 ##############################################################################
 #                           Fenêtre Principale (F2-F5)                       #
@@ -169,7 +89,7 @@ class MainApp(tk.Tk):
 
     # F4 : Ordres de Fab
     def show_of(self):
-        state = tk.simpledialog.askstring("Filtrer", "État OF (confirmed, progress, done, cancel) ou vide :")
+        state = tk.simpledialog.askstring("Filtrer", "État OF (confirmed, progress, done, cancel, etc.) ou vide :")
         if state:
             orders = self.odoo.get_manufacturing_orders(state_filter=state)
         else:
@@ -179,6 +99,7 @@ class MainApp(tk.Tk):
             messagebox.showinfo("OF", "Aucun ordre trouvé.")
             return
 
+        # On vide le main_frame
         for w in self.main_frame.winfo_children():
             w.destroy()
 
@@ -245,25 +166,35 @@ class LoginPage:
         self.username_var = tk.StringVar()
         self.password_var = tk.StringVar()
 
-        # Chemins images
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        img_dir = os.path.join(script_dir, "images")
+        # PARAMETRES ODOO
+        # Ajustez ici selon votre serveur/bdd
+        self.host = "172.31.10.137"
+        self.port = "8027"
+        self.db   = "demo"
 
-        bg_path = os.path.join(img_dir, "background1.png")
-        vector_path = os.path.join(img_dir, "vector.png")
-        hyy_path = os.path.join(img_dir, "hyy.png")
-        user_ico = os.path.join(img_dir, "username_icon.png")
-        pass_ico = os.path.join(img_dir, "password_icon.png")
-        show_img_path = os.path.join(img_dir, "show.png")
-        hide_img_path = os.path.join(img_dir, "hide.png")
-        btn1_path = os.path.join(img_dir, "btn1.png")
+        # Exemples de chemins d'images (à adapter si besoin)
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        img_dir    = os.path.join(script_dir, "images")
+
+        bg_path        = os.path.join(img_dir, "background1.png")
+        vector_path    = os.path.join(img_dir, "vector.png")
+        hyy_path       = os.path.join(img_dir, "hyy.png")
+        user_ico       = os.path.join(img_dir, "username_icon.png")
+        pass_ico       = os.path.join(img_dir, "password_icon.png")
+        show_img_path  = os.path.join(img_dir, "show.png")
+        hide_img_path  = os.path.join(img_dir, "hide.png")
+        btn1_path      = os.path.join(img_dir, "btn1.png")
 
         # Fond
-        bg = Image.open(bg_path)
-        bg_photo = ImageTk.PhotoImage(bg)
-        label_bg = tk.Label(self.root, image=bg_photo)
-        label_bg.image = bg_photo
-        label_bg.pack(fill="both", expand=True)
+        try:
+            bg = Image.open(bg_path)
+            bg_photo = ImageTk.PhotoImage(bg)
+            label_bg = tk.Label(self.root, image=bg_photo)
+            label_bg.image = bg_photo
+            label_bg.pack(fill="both", expand=True)
+        except:
+            # Au cas où l'image ne serait pas trouvée
+            self.root.configure(bg="white")
 
         # Frame
         self.lgn_frame = tk.Frame(self.root, bg="#040405", width=950, height=600)
@@ -280,16 +211,22 @@ class LoginPage:
         self.heading.place(x=80, y=30, width=300, height=30)
 
         # Image gauche
-        vect = Image.open(vector_path)
-        vect_photo = ImageTk.PhotoImage(vect)
-        tk.Label(self.lgn_frame, image=vect_photo, bg="#040405").place(x=5, y=100)
-        self._vect_photo = vect_photo
+        try:
+            vect = Image.open(vector_path)
+            vect_photo = ImageTk.PhotoImage(vect)
+            tk.Label(self.lgn_frame, image=vect_photo, bg="#040405").place(x=5, y=100)
+            self._vect_photo = vect_photo
+        except:
+            pass
 
         # Sign In image
-        hyy = Image.open(hyy_path)
-        hyy_photo = ImageTk.PhotoImage(hyy)
-        tk.Label(self.lgn_frame, image=hyy_photo, bg="#040405").place(x=620, y=130)
-        self._hyy_photo = hyy_photo
+        try:
+            hyy = Image.open(hyy_path)
+            hyy_photo = ImageTk.PhotoImage(hyy)
+            tk.Label(self.lgn_frame, image=hyy_photo, bg="#040405").place(x=620, y=130)
+            self._hyy_photo = hyy_photo
+        except:
+            pass
 
         # Label Sign In
         tk.Label(self.lgn_frame, text="Sign In", bg="#040405", fg="white",
@@ -314,10 +251,13 @@ class LoginPage:
         tk.Canvas(self.lgn_frame, width=300, height=2.0, bg="#bdb9b1",
                   highlightthickness=0).place(x=550, y=359)
 
-        user_img = Image.open(user_ico)
-        user_img_photo = ImageTk.PhotoImage(user_img)
-        tk.Label(self.lgn_frame, image=user_img_photo, bg="#040405").place(x=550, y=332)
-        self._user_img_photo = user_img_photo
+        try:
+            user_img = Image.open(user_ico)
+            user_img_photo = ImageTk.PhotoImage(user_img)
+            tk.Label(self.lgn_frame, image=user_img_photo, bg="#040405").place(x=550, y=332)
+            self._user_img_photo = user_img_photo
+        except:
+            pass
 
         # Password
         tk.Label(self.lgn_frame, text="Password", bg="#040405", fg="#4f4e4d",
@@ -339,63 +279,75 @@ class LoginPage:
         tk.Canvas(self.lgn_frame, width=300, height=2.0, bg="#bdb9b1",
                   highlightthickness=0).place(x=550, y=440)
 
-        pass_img = Image.open(pass_ico)
-        pass_img_photo = ImageTk.PhotoImage(pass_img)
-        tk.Label(self.lgn_frame, image=pass_img_photo, bg="#040405").place(x=550, y=414)
-        self._pass_img_photo = pass_img_photo
+        try:
+            pass_img = Image.open(pass_ico)
+            pass_img_photo = ImageTk.PhotoImage(pass_img)
+            tk.Label(self.lgn_frame, image=pass_img_photo, bg="#040405").place(x=550, y=414)
+            self._pass_img_photo = pass_img_photo
+        except:
+            pass
 
         # Show/Hide
-        show_img = ImageTk.PhotoImage(file=show_img_path)
-        hide_img = ImageTk.PhotoImage(file=hide_img_path)
-        self.show_img = show_img
-        self.hide_img = hide_img
-        self.show_button = tk.Button(
-            self.lgn_frame,
-            image=self.show_img,
-            command=self.show_pwd,
-            relief=tk.FLAT,
-            activebackground="white",
-            borderwidth=0,
-            background="white",
-            cursor="hand2"
-        )
-        self.show_button.place(x=860, y=420)
+        try:
+            show_img = ImageTk.PhotoImage(file=show_img_path)
+            hide_img = ImageTk.PhotoImage(file=hide_img_path)
+            self.show_img = show_img
+            self.hide_img = hide_img
+            self.show_button = tk.Button(
+                self.lgn_frame,
+                image=self.show_img,
+                command=self.show_pwd,
+                relief=tk.FLAT,
+                activebackground="white",
+                borderwidth=0,
+                background="white",
+                cursor="hand2"
+            )
+            self.show_button.place(x=860, y=420)
+        except:
+            pass
 
         # Bouton Login
-        btn1 = Image.open(btn1_path)
-        btn1_photo = ImageTk.PhotoImage(btn1)
-        btn1_label = tk.Label(self.lgn_frame, image=btn1_photo, bg="#040405")
-        btn1_label.image = btn1_photo
-        btn1_label.place(x=550, y=450)
+        try:
+            btn1 = Image.open(btn1_path)
+            btn1_photo = ImageTk.PhotoImage(btn1)
+            btn1_label = tk.Label(self.lgn_frame, image=btn1_photo, bg="#040405")
+            btn1_label.image = btn1_photo
+            btn1_label.place(x=550, y=450)
 
-        self.login_btn = tk.Button(
-            btn1_label,
-            text='LOGIN',
-            font=("yu gothic ui", 13, "bold"),
-            width=20,
-            bd=0,
-            highlightthickness=0,
-            relief='flat',
-            fg='white',
-            bg='#3047ff',
-            activebackground='#3047ff',
-            command=self.login_action
-        )
-        self.login_btn.place(x=20, y=10)
-        self._btn1_photo = btn1_photo
+            self.login_btn = tk.Button(
+                btn1_label,
+                text='LOGIN',
+                font=("yu gothic ui", 13, "bold"),
+                width=20,
+                bd=0,
+                highlightthickness=0,
+                relief='flat',
+                fg='white',
+                bg='#3047ff',
+                activebackground='#3047ff',
+                command=self.login_action
+            )
+            self.login_btn.place(x=20, y=10)
+            self._btn1_photo = btn1_photo
+        except:
+            # fallback si pas d'image
+            self.login_btn = tk.Button(
+                self.lgn_frame,
+                text='LOGIN',
+                font=("yu gothic ui", 13, "bold"),
+                width=20,
+                command=self.login_action
+            )
+            self.login_btn.place(x=600, y=460)
 
     def login_action(self):
         """Méthode de connexion Odoo (F1)."""
         username = self.username_var.get()
         password = self.password_var.get()
 
-        # Paramètres Odoo (à adapter)
-        host = "172.31.10.137"
-        port = "8027"
-        db   = "demo"
-
-        # Instancier IF_Odoo
-        self.odoo_conn = IF_Odoo(host, port, db, username, password)
+        # Instancier l'interface Odoo
+        self.odoo_conn = IF_Odoo(self.host, self.port, self.db, username, password)
         success = self.odoo_conn.connect()
         if success:
             # Fermer la fenêtre de login
