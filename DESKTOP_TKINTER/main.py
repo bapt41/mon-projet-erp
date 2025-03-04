@@ -339,18 +339,19 @@ class DashboardApp(tk.Tk):
 class HomePage(tk.Frame):
     """
     Page d'accueil / Tableau de bord.
-    On y affiche la date du jour, l'utilisateur connecté, 
-    et quelques indicateurs clés (KPI).
+    Affiche plusieurs indicateurs récupérés depuis Odoo :
+      - Date du jour
+      - Utilisateur connecté
+      - Informations sur l'entreprise (si disponibles)
+      - Nombre de commandes clients
+      - Nombre de produits
+      - Nombre d'OF en cours
     """
     def __init__(self, parent, app):
         super().__init__(parent, bg="#10142c")
         self.app = app
 
-        # On récupère l'utilisateur connecté (si vous avez son nom depuis Odoo ou depuis la LoginPage)
-        # Par exemple, si vous avez un attribut self.app.odoo.user => on l'affiche
-        user_name = self.app.odoo.user or "Utilisateur"
-
-        # 1) Barre de titre / date
+        # 1) Barre de titre avec la date
         title_frame = tk.Frame(self, bg="#10142c")
         title_frame.pack(fill="x", pady=10)
 
@@ -358,7 +359,6 @@ class HomePage(tk.Frame):
                  bg="#10142c", fg="white", font=("Arial", 24, "bold")
         ).pack(side="left", padx=20)
 
-        # Date du jour
         import datetime
         now = datetime.datetime.now()
         date_str = now.strftime("%d/%m/%Y")
@@ -367,52 +367,60 @@ class HomePage(tk.Frame):
         ).pack(side="right", padx=20)
 
         # 2) Infos sur l'utilisateur
+        # On suppose que le login (IF_Odoo.user) contient le nom de l'utilisateur.
+        user_name = self.app.odoo.user or "Utilisateur"
         user_frame = tk.Frame(self, bg="#1b1f3b")
         user_frame.pack(fill="x", padx=20, pady=(0, 10))
-
         tk.Label(user_frame, text=f"Connecté en tant que : {user_name}",
                  bg="#1b1f3b", fg="white", font=("Arial", 12, "bold")
         ).pack(side="left", padx=10, pady=10)
 
-        # 3) Section “KPI” / Indicateurs
-        # On imagine quelques indicateurs (chiffre d'affaires, nombre de commandes, etc.)
-        # On les affiche dans des cards horizontales
+        # 3) Section KPI
         kpi_frame = tk.Frame(self, bg="#10142c")
         kpi_frame.pack(fill="x", padx=20, pady=10)
 
-        # Exemple : 3 KPI côte à côte
-        # KPI 1
-        self.create_kpi_card(kpi_frame, "CA Mensuel", "1500k €", "#eb53a2").pack(side="left", expand=True, fill="both", padx=5)
-        # KPI 2
-        self.create_kpi_card(kpi_frame, "Commandes", "320", "#3aaed8").pack(side="left", expand=True, fill="both", padx=5)
-        # KPI 3
-        self.create_kpi_card(kpi_frame, "Clients Actifs", "1,200", "#9263f9").pack(side="left", expand=True, fill="both", padx=5)
+        # KPI : Fiche Entreprise
+        company_info = self.app.odoo.get_company_info()
+        if company_info:
+            company_text = company_info.get("name", "N/A")
+        else:
+            company_text = "Non disponible"
+        self.create_kpi_card(kpi_frame, "Entreprise", company_text, "#eb53a2").pack(side="left", expand=True, fill="both", padx=5)
 
-        # 4) Section “Quick Links” ou “Dernières Tâches”
+        # KPI : Nombre de commandes clients
+        order_count = self.app.odoo.get_sales_order_count()
+        self.create_kpi_card(kpi_frame, "Commandes", f"{order_count}", "#ff9900").pack(side="left", expand=True, fill="both", padx=5)
+
+        # KPI : Nombre de produits
+        products = self.app.odoo.get_products()
+        product_count = len(products)
+        self.create_kpi_card(kpi_frame, "Produits", f"{product_count}", "#3aaed8").pack(side="left", expand=True, fill="both", padx=5)
+
+        # KPI : Nombre d'OF en cours
+        # Ici, on suppose que l'état "progress" représente les OF en cours.
+        of_in_progress = self.app.odoo.get_manufacturing_orders(state_filter="progress")
+        of_count = len(of_in_progress)
+        self.create_kpi_card(kpi_frame, "OF en cours", f"{of_count}", "#9263f9").pack(side="left", expand=True, fill="both", padx=5)
+
+        # 4) Section Complémentaire (Quick Links / Dernières Tâches)
         bottom_frame = tk.Frame(self, bg="#10142c")
         bottom_frame.pack(fill="both", expand=True, padx=20, pady=(10,20))
 
-        # Quick links
+        # Quick Links
         quick_links_frame = tk.Frame(bottom_frame, bg="#1b1f3b")
         quick_links_frame.pack(side="left", fill="y", padx=5, pady=5)
-
         tk.Label(quick_links_frame, text="Quick Links", bg="#1b1f3b", fg="white",
                  font=("Arial", 14, "bold")).pack(pady=10, padx=10)
-
-        # Quelques liens factices
         links = ["Créer un produit", "Lister OF en cours", "Gérer la facturation", "Rapport des ventes"]
         for link in links:
             tk.Button(quick_links_frame, text=link, bg="#3047ff", fg="white",
                       font=("Arial", 10), bd=0, padx=10, pady=5).pack(pady=5, padx=10, fill="x")
 
-        # Espace pour un “mini calendrier” ou “tâches”
+        # Tâches récentes (exemple fictif)
         tasks_frame = tk.Frame(bottom_frame, bg="#1b1f3b")
         tasks_frame.pack(side="right", expand=True, fill="both", padx=5, pady=5)
-
         tk.Label(tasks_frame, text="Tâches récentes", bg="#1b1f3b", fg="white",
                  font=("Arial", 14, "bold")).pack(pady=10, padx=10)
-
-        # Liste factice
         tasks = [
             "OF #1002: Production en cours",
             "Commande #SO1001: à livrer",
@@ -425,21 +433,21 @@ class HomePage(tk.Frame):
 
     def create_kpi_card(self, parent, title, value, color):
         """
-        Crée un 'card' de KPI (titre + valeur), renvoie un Frame.
-        :param parent: frame parent
-        :param title: ex. "CA Mensuel"
-        :param value: ex. "150k €"
-        :param color: ex. "#eb53a2" (couleur du chiffre)
+        Crée un "card" de KPI avec un titre et une valeur.
+        :param parent: widget parent
+        :param title: Titre du KPI (ex: "Commandes")
+        :param value: Valeur du KPI (ex: "320")
+        :param color: Couleur pour la valeur (ex: "#ff9900")
+        :return: un Frame contenant le KPI.
         """
         frame = tk.Frame(parent, bg="#1b1f3b", width=200, height=80)
-        frame.pack_propagate(False)  # pour garder la taille mini
-
+        frame.pack_propagate(False)
         tk.Label(frame, text=title, bg="#1b1f3b", fg="white",
                  font=("Arial", 12, "bold")).pack(pady=5)
         tk.Label(frame, text=value, bg="#1b1f3b", fg=color,
                  font=("Arial", 16, "bold")).pack()
-
         return frame
+
 
 
 
@@ -489,107 +497,102 @@ class ProductsPage(tk.Frame):
                         font=("Arial", 12, "bold"), command=self.show_products)
         btn.pack(pady=10)
 
-        # --- Création d'une zone scrollable ---
-        # On utilise un Canvas + un Frame + une Scrollbar
+        # --- Création d'une zone scrollable (verticale) ---
         container = tk.Frame(self, bg="#10142c")
         container.pack(fill="both", expand=True, padx=20, pady=10)
 
         self.canvas = tk.Canvas(container, bg="#10142c", highlightthickness=0)
         self.scrollbar = tk.Scrollbar(container, orient="vertical", command=self.canvas.yview)
+
+        # On crée un frame qui contiendra les tuiles, et qu'on placera dans le Canvas
         self.scrollable_frame = tk.Frame(self.canvas, bg="#10142c")
 
+        # Pour que .grid() fonctionne correctement, on peut configurer les colonnes
+        # (si vous voulez 3 colonnes, vous pouvez faire 3 .grid_columnconfigure(...))
+        for col_index in range(3):
+            self.scrollable_frame.grid_columnconfigure(col_index, weight=1, pad=10)
+
+        # On relie l'événement <Configure> pour ajuster la scrollregion
         self.scrollable_frame.bind(
             "<Configure>",
-            lambda e: self.canvas.configure(
-                scrollregion=self.canvas.bbox("all")
-            )
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
         )
 
+        # On place la scrollable_frame dans le canvas
         self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
 
         self.canvas.pack(side="left", fill="both", expand=True)
         self.scrollbar.pack(side="right", fill="y")
 
-        # Pour conserver les références d'images (sinon garbage collector)
+        # Pour garder les références d'images
         self.product_images = []
 
     def show_products(self):
-        # On vide le contenu existant (si on reclique plusieurs fois)
+        # Vider le contenu existant
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
         self.product_images.clear()
 
-        # Récupérer les produits avec les champs souhaités
-        # Pour la catégorie, la description, etc., il faut préciser ces champs dans l'interface Odoo
-        # Par exemple, adapter la méthode get_products() pour inclure 'categ_id', 'description_sale', ...
-        products = self.app.odoo.get_products()  # À adapter si nécessaire
-
+        # Récupérer les produits
+        products = self.app.odoo.get_products()
         if not products:
             messagebox.showinfo("Produits", "Aucun produit trouvé.")
             return
 
-        # Pour chaque produit, créer une tuile
+        # Nombre de colonnes qu'on souhaite (par exemple 3)
+        num_cols = 3
+
         for idx, prod in enumerate(products):
             name  = prod.get("name", "N/A")
             price = prod.get("list_price", 0.0)
-            
-            # On suppose qu'on a 'categ_id' et 'description_sale' si vous les avez demandés
-            categ_id = prod.get("categ_id", False)  # parfois c'est [id, "nom de la catégorie"]
-            # Si c'est un Many2one, Odoo renvoie un tuple [id, "NomCat"]
+            categ_id = prod.get("categ_id", False)
             category_name = ""
             if isinstance(categ_id, list) and len(categ_id) == 2:
                 category_name = categ_id[1]
-
             description = prod.get("description_sale", "")
 
-            # Récupérer l'image base64
             image_b64 = prod.get("image_1920", False)
+
+            # On calcule la row/column pour ce produit
+            row = idx // num_cols
+            col = idx % num_cols
 
             # Frame “tuile”
             tile_frame = tk.Frame(self.scrollable_frame, bg="#1b1f3b", bd=2, relief="groove")
-            tile_frame.pack(fill="x", pady=5, padx=5)
+
+            # Au lieu de pack(), on place la tuile avec grid()
+            tile_frame.grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
 
             # Décoder l'image si présente
             if image_b64:
                 import base64
-                image_data = base64.b64decode(image_b64)
-                # Convertir en PhotoImage via PIL
                 from io import BytesIO
+                image_data = base64.b64decode(image_b64)
                 img_PIL = Image.open(BytesIO(image_data))
-                img_PIL = img_PIL.resize((80, 80), Image.Resampling.LANCZOS)  # Redimension
+                img_PIL = img_PIL.resize((80, 80), Image.Resampling.LANCZOS)
                 photo = ImageTk.PhotoImage(img_PIL)
             else:
                 photo = None
 
             if photo:
-                self.product_images.append(photo)  # garder la référence
+                self.product_images.append(photo)
                 img_label = tk.Label(tile_frame, image=photo, bg="#1b1f3b")
-                img_label.pack(side="left", padx=10, pady=10)
+                img_label.pack(side="top", padx=10, pady=10)
 
-            # Frame pour le texte (nom, prix, catégorie, description)
+            # Frame pour le texte
             text_frame = tk.Frame(tile_frame, bg="#1b1f3b")
-            text_frame.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+            text_frame.pack(side="top", fill="both", expand=True, padx=10, pady=10)
 
-            # Nom
             tk.Label(text_frame, text=f"Name: {name}",
-                     bg="#1b1f3b", fg="white", font=("Arial", 12, "bold")
-                     ).pack(anchor="w")
-
-            # Prix
+                     bg="#1b1f3b", fg="white", font=("Arial", 12, "bold")).pack(anchor="w")
             tk.Label(text_frame, text=f"Price: {price}",
-                     bg="#1b1f3b", fg="white", font=("Arial", 12)
-                     ).pack(anchor="w")
-
-            # Catégorie
+                     bg="#1b1f3b", fg="white", font=("Arial", 12)).pack(anchor="w")
             tk.Label(text_frame, text=f"Category: {category_name}",
-                     bg="#1b1f3b", fg="white", font=("Arial", 12)
-                     ).pack(anchor="w")
-
-            # Description
+                     bg="#1b1f3b", fg="white", font=("Arial", 12)).pack(anchor="w")
             tk.Label(text_frame, text=f"Description: {description}",
-                     bg="#1b1f3b", fg="white", font=("Arial", 12)
-                     ).pack(anchor="w")
+                     bg="#1b1f3b", fg="white", font=("Arial", 12)).pack(anchor="w")
+
 
 
 
@@ -654,41 +657,42 @@ class OrdersPage(tk.Frame):
 
 
 class UpdateQtyPage(tk.Frame):
-    """ F5 : Mettre à jour la quantité produite d'un OF. """
+    """
+    F5 : Mettre à jour la quantité produite d'un OF en saisissant le NOM (ex: "MO/00014").
+    """
     def __init__(self, parent, app):
         super().__init__(parent, bg="#10142c")
         self.app = app
 
-        tk.Label(self, text="Modifier Qté Produite (F5)", bg="#10142c", fg="white",
-                 font=("Arial", 18, "bold")).pack(pady=20)
+        title = tk.Label(self, text="Modifier Qté Produite (F5)",
+                         bg="#10142c", fg="white", font=("Arial", 18, "bold"))
+        title.pack(pady=20)
 
+        # Fields
         form_frame = tk.Frame(self, bg="#10142c")
-        form_frame.pack(pady=30)
+        form_frame.pack(pady=40)
 
-        tk.Label(form_frame, text="ID de l'OF :", bg="#10142c", fg="white",
+        tk.Label(form_frame, text="Nom de l'OF :", bg="#10142c", fg="white",
                  font=("Arial", 12)).grid(row=0, column=0, padx=5, pady=5, sticky="e")
-        self.mo_id_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=self.mo_id_var).grid(row=0, column=1, padx=5, pady=5)
+        self.mo_name_var = tk.StringVar()
+        tk.Entry(form_frame, textvariable=self.mo_name_var).grid(row=0, column=1, padx=5, pady=5)
 
         tk.Label(form_frame, text="Nouvelle quantité :", bg="#10142c", fg="white",
                  font=("Arial", 12)).grid(row=1, column=0, padx=5, pady=5, sticky="e")
         self.qty_var = tk.StringVar()
         tk.Entry(form_frame, textvariable=self.qty_var).grid(row=1, column=1, padx=5, pady=5)
 
+        # Button
         update_btn = tk.Button(
-            self, text="Mettre à jour", bg="#3047ff", fg="white",
-            font=("Arial", 12, "bold"), command=self.update_of_qty
+            self, text="Mettre à jour",
+            bg="#3047ff", fg="white", font=("Arial", 12, "bold"),
+            command=self.update_of_qty
         )
         update_btn.pack()
 
     def update_of_qty(self):
-        mo_id_str = self.mo_id_var.get().strip()
-        if not mo_id_str:
-            return
-        try:
-            mo_id = int(mo_id_str)
-        except ValueError:
-            messagebox.showerror("Erreur", "ID invalide.")
+        mo_name_str = self.mo_name_var.get().strip()
+        if not mo_name_str:
             return
 
         new_qty_str = self.qty_var.get().strip()
@@ -700,11 +704,14 @@ class UpdateQtyPage(tk.Frame):
             messagebox.showerror("Erreur", "Quantité invalide.")
             return
 
-        ok = self.app.odoo.update_mo_quantity(mo_id, new_qty)
+        # Appel à la méthode qui met à jour en cherchant par name
+        ok = self.app.odoo.update_mo_quantity_by_name(mo_name_str, new_qty)
         if ok:
-            messagebox.showinfo("Succès", f"OF {mo_id} mis à jour.")
+            messagebox.showinfo("Succès", f"OF '{mo_name_str}' mis à jour.")
         else:
-            messagebox.showerror("Erreur", f"Impossible de mettre à jour l'OF {mo_id}.")
+            messagebox.showerror("Erreur", f"Impossible de mettre à jour l'OF '{mo_name_str}'.")
+
+
 
 
 ##############################################################################
