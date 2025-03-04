@@ -5,33 +5,41 @@ import base64
 class IF_Odoo:
     """
     Interface Python <-> Odoo via XML-RPC.
-    Permet la connexion, la récupération de données (fiche d'entreprise,
-    produits, ordres de fabrication, commandes clients, tâches récentes),
-    et la mise à jour d'un ordre de fabrication par son nom.
+    Permet la connexion et l'interaction avec divers modèles :
+      - res.company (fiche d'entreprise)
+      - product.template (produits)
+      - mrp.production (ordres de fabrication)
+      - sale.order (commandes clients)
+      - project.task (tâches récentes)
+      
+    Fournit également des méthodes pour :
+      - Mettre à jour la quantité produite d'un OF en recherchant par son nom.
+      - Récupérer les nouveautés (dernières OF et commandes).
+      - Sauvegarder l'image d'un produit.
     """
 
     def __init__(self, host, port, db, user, pwd):
         """
-        Initialisation avec les paramètres de connexion.
-        :param host: Adresse du serveur Odoo (ex: "localhost" ou "172.31.10.137")
+        Initialise la connexion avec les paramètres Odoo.
+        :param host: Adresse du serveur (ex: "localhost" ou "172.31.10.137")
         :param port: Port d'accès (ex: "8069" ou "8027")
-        :param db:   Nom de la base de données (ex: "demo")
-        :param user: Utilisateur (login) Odoo
-        :param pwd:  Mot de passe Odoo
+        :param db: Nom de la base (ex: "demo")
+        :param user: Utilisateur Odoo (login)
+        :param pwd: Mot de passe Odoo
         """
         self.host = host
         self.port = port
-        self.db   = db
+        self.db = db
         self.user = user
-        self.pwd  = pwd
+        self.pwd = pwd
 
-        self.uid    = None  # Identifiant utilisateur après authentification
+        self.uid = None     # Identifiant utilisateur après authentification
         self.models = None  # Proxy pour les appels sur /xmlrpc/2/object
 
     def connect(self):
         """
         Tente de se connecter à Odoo via XML-RPC.
-        Retourne True en cas de succès, False sinon.
+        Retourne True si la connexion est établie, sinon False.
         """
         try:
             url = f"http://{self.host}:{self.port}"
@@ -48,7 +56,7 @@ class IF_Odoo:
     def get_company_info(self):
         """
         Récupère la fiche de l'entreprise (res.company).
-        Retourne un dictionnaire avec 'name', 'street', 'city', 'phone'.
+        Retourne un dictionnaire contenant 'name', 'street', 'city', 'phone'.
         """
         if not self.models:
             return {}
@@ -66,8 +74,8 @@ class IF_Odoo:
 
     def get_products(self):
         """
-        Récupère la liste des produits (product.template) avec :
-            - name, list_price, image_1920, categ_id, description_sale.
+        Récupère la liste des produits (product.template) avec les champs :
+          - name, list_price, image_1920, categ_id, description_sale.
         Retourne une liste de dictionnaires.
         """
         if not self.models:
@@ -88,32 +96,27 @@ class IF_Odoo:
         """
         Récupère la liste des Ordres de Fabrication (mrp.production).
         :param state_filter: Filtre par état ('confirmed', 'progress', 'done', 'cancel')
-                            ou "all" pour récupérer toutes les OF.
-        :return: Liste de dictionnaires contenant 'name', 'product_qty', 'qty_producing', 'state'
+                             ou "all" pour récupérer toutes les OF.
+        :return: Liste de dictionnaires avec 'name', 'product_qty', 'qty_producing', 'state'.
         """
         if not self.models:
             return []
+        # Si state_filter vaut "all" ou est None, aucun filtre n'est appliqué
         if state_filter is None or state_filter == "all":
             domain = []
-            limit_value = 0  # ou supprimer 'limit' dans le dictionnaire
         else:
             domain = [('state', '=', state_filter)]
-            limit_value = 50  # ou un nombre adapté
         try:
             orders = self.models.execute_kw(
                 self.db, self.uid, self.pwd,
                 'mrp.production', 'search_read',
                 [domain],
-                {'fields': ['name', 'product_qty', 'qty_producing', 'state'], 'limit': limit_value}  # Si limit_value vaut 0, cela peut signifier "aucune limite" selon votre version d'Odoo.
+                {'fields': ['name', 'product_qty', 'qty_producing', 'state'], 'limit': 1000}
             )
             return orders
         except Exception as e:
             print(f"[IF_Odoo] Erreur get_manufacturing_orders : {e}")
             return []
-
-
-
-
 
     def update_mo_quantity_by_name(self, mo_name, new_qty):
         """
@@ -121,7 +124,7 @@ class IF_Odoo:
         en recherchant l'enregistrement par le champ 'name' (ex: "MO/00014").
         :param mo_name: Nom de l'OF.
         :param new_qty: Nouvelle quantité produite (float).
-        :return: True si la mise à jour est effectuée, False sinon.
+        :return: True si la mise à jour est effectuée, sinon False.
         """
         if not self.models:
             return False
@@ -148,7 +151,7 @@ class IF_Odoo:
 
     def get_sales_order_count(self):
         """
-        Retourne le nombre total de commandes clients (sale.order) enregistrées dans Odoo.
+        Retourne le nombre total de commandes clients (sale.order).
         """
         if not self.models:
             return 0
@@ -165,9 +168,9 @@ class IF_Odoo:
 
     def get_recent_tasks(self, limit=5):
         """
-        Récupère les tâches récentes depuis Odoo.
-        Retourne une liste de dictionnaires contenant les champs 'name', 'date_deadline', 'user_id' et 'stage_id'.
-        Si le modèle project.task n'existe pas, renvoie une liste vide.
+        Récupère les tâches récentes (project.task) depuis Odoo.
+        Retourne une liste de dictionnaires avec 'name', 'date_deadline', 'user_id' et 'stage_id'.
+        Si le modèle n'existe pas, renvoie une liste vide.
         """
         if not self.models:
             return []
@@ -176,25 +179,83 @@ class IF_Odoo:
                 self.db, self.uid, self.pwd,
                 'project.task', 'search_read',
                 [[]],
-                {
-                    'fields': ['name', 'date_deadline', 'user_id', 'stage_id'],
-                    'limit': limit,
-                    'order': 'create_date desc'
-                }
+                {'fields': ['name', 'date_deadline', 'user_id', 'stage_id'],
+                 'limit': limit,
+                 'order': 'create_date desc'}
             )
             return tasks
         except Exception as e:
             print(f"[IF_Odoo] Erreur get_recent_tasks : {e}")
             return []
 
+    def get_new_manufacturing_orders(self, limit=5):
+        """
+        Récupère les dernières OF créées (mrp.production) triées par date de création décroissante.
+        Retourne une liste de dictionnaires avec 'name', 'product_qty', 'qty_producing', 'state' et 'create_date'.
+        """
+        if not self.models:
+            return []
+        try:
+            orders = self.models.execute_kw(
+                self.db, self.uid, self.pwd,
+                'mrp.production', 'search_read',
+                [[]],
+                {'fields': ['name', 'product_qty', 'qty_producing', 'state', 'create_date'],
+                 'limit': limit,
+                 'order': 'create_date desc'}
+            )
+            return orders
+        except Exception as e:
+            print(f"[IF_Odoo] Erreur get_new_manufacturing_orders : {e}")
+            return []
+
+    def get_new_sales_orders(self, limit=5):
+        """
+        Récupère les dernières commandes clients (sale.order) triées par date de création décroissante.
+        Retourne une liste de dictionnaires avec 'name', 'amount_total', 'state' et 'create_date'.
+        """
+        if not self.models:
+            return []
+        try:
+            orders = self.models.execute_kw(
+                self.db, self.uid, self.pwd,
+                'sale.order', 'search_read',
+                [[]],
+                {'fields': ['name', 'amount_total', 'state', 'create_date'],
+                 'limit': limit,
+                 'order': 'create_date desc'}
+            )
+            return orders
+        except Exception as e:
+            print(f"[IF_Odoo] Erreur get_new_sales_orders : {e}")
+            return []
+
+    def get_manufacturing_order_details_by_name(self, mo_name):
+        """
+        Récupère les détails d'un Ordre de Fabrication (mrp.production) en recherchant par 'name'.
+        Retourne un dictionnaire avec 'id', 'name', 'product_qty', 'qty_producing', et 'move_raw_ids' (composants).
+        """
+        if not self.models:
+            return {}
+        try:
+            recs = self.models.execute_kw(
+                self.db, self.uid, self.pwd,
+                'mrp.production', 'search_read',
+                [[('name', '=', mo_name)]],
+                {'fields': ['id', 'name', 'product_qty', 'qty_producing', 'move_raw_ids'], 'limit': 1}
+            )
+            return recs[0] if recs else {}
+        except Exception as e:
+            print(f"[IF_Odoo] Erreur get_manufacturing_order_details_by_name : {e}")
+            return {}
 
     def save_product_image(self, product_id, image_filename):
         """
         Récupère l'image binaire (image_1920) d'un produit (product.template)
         et la sauvegarde dans un fichier.
         :param product_id: ID du produit.
-        :param image_filename: Chemin complet du fichier de sauvegarde.
-        :return: True si l'image est sauvegardée, False sinon.
+        :param image_filename: Chemin complet du fichier.
+        :return: True si l'image est sauvegardée, sinon False.
         """
         if not self.models:
             return False

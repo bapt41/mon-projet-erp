@@ -336,6 +336,7 @@ class DashboardApp(tk.Tk):
 ##############################################################################
 #                          Pages (F2-F5 + Home)                              #
 ##############################################################################
+
 class HomePage(tk.Frame):
     """
     Page d'accueil / Tableau de bord.
@@ -346,7 +347,7 @@ class HomePage(tk.Frame):
       - Nombre de commandes clients
       - Nombre de produits
       - Nombre d'OF en cours
-      - Tâches récentes (récupérées depuis Odoo)
+      - Nouveautés : dernières OF et dernières commandes
     """
     def __init__(self, parent, app):
         super().__init__(parent, bg="#10142c")
@@ -376,61 +377,56 @@ class HomePage(tk.Frame):
         # 3) Section KPI
         kpi_frame = tk.Frame(self, bg="#10142c")
         kpi_frame.pack(fill="x", padx=20, pady=10)
-
-        # KPI : Fiche Entreprise (nom de l'entreprise)
         company_info = self.app.odoo.get_company_info()
         company_text = company_info.get("name", "Non disponible") if company_info else "Non disponible"
         self.create_kpi_card(kpi_frame, "Entreprise", company_text, "#eb53a2").pack(side="left", expand=True, fill="both", padx=5)
-
-        # KPI : Nombre de commandes clients
         order_count = self.app.odoo.get_sales_order_count()
         self.create_kpi_card(kpi_frame, "Commandes", f"{order_count}", "#ff9900").pack(side="left", expand=True, fill="both", padx=5)
-
-        # KPI : Nombre de produits
         products = self.app.odoo.get_products()
         product_count = len(products)
         self.create_kpi_card(kpi_frame, "Produits", f"{product_count}", "#3aaed8").pack(side="left", expand=True, fill="both", padx=5)
-
-        # KPI : Nombre d'OF en cours (filtre sur l'état "progress")
         of_in_progress = self.app.odoo.get_manufacturing_orders(state_filter="progress")
         of_count = len(of_in_progress)
         self.create_kpi_card(kpi_frame, "OF en cours", f"{of_count}", "#9263f9").pack(side="left", expand=True, fill="both", padx=5)
 
-        # 4) Section Tâches récentes récupérées depuis Odoo
-        bottom_frame = tk.Frame(self, bg="#10142c")
-        bottom_frame.pack(fill="both", expand=True, padx=20, pady=(10,20))
-        tasks_frame = tk.Frame(bottom_frame, bg="#1b1f3b")
-        tasks_frame.pack(side="right", expand=True, fill="both", padx=5, pady=5)
-        tk.Label(tasks_frame, text="Tâches récentes", bg="#1b1f3b", fg="white",
-                 font=("Arial", 14, "bold")).pack(pady=10, padx=10)
-        
-        # Récupération des tâches récentes depuis Odoo
-        recent_tasks = self.app.odoo.get_recent_tasks(limit=5)
-        if recent_tasks:
-            for task in recent_tasks:
-                # Extraction des champs
-                task_name = task.get("name", "Sans nom")
-                deadline = task.get("date_deadline", "Aucune date")
-                user_info = task.get("user_id", [None, "Non assigné"])
-                stage_info = task.get("stage_id", [None, ""])
-                user_assigned = user_info[1] if isinstance(user_info, list) and len(user_info) == 2 else "Non assigné"
-                stage_name = stage_info[1] if isinstance(stage_info, list) and len(stage_info) == 2 else ""
-                task_text = f"• {task_name} | Deadline: {deadline} | Assigné à: {user_assigned} | Étape: {stage_name}"
-                tk.Label(tasks_frame, text=task_text, bg="#1b1f3b", fg="white",
-                         font=("Arial", 12)).pack(anchor="w", padx=20, pady=2)
+        # 4) Section Nouveautés
+        nouveautes_frame = tk.Frame(self, bg="#10142c")
+        nouveautes_frame.pack(fill="both", expand=True, padx=20, pady=(10,20))
+
+        # Sous-section : Nouvelles OF
+        new_of_frame = tk.Frame(nouveautes_frame, bg="#1b1f3b")
+        new_of_frame.pack(side="left", expand=True, fill="both", padx=10, pady=5)
+        tk.Label(new_of_frame, text="Nouvelles OF", bg="#1b1f3b", fg="white",
+                 font=("Arial", 14, "bold")).pack(pady=10)
+        new_of = self.app.odoo.get_new_manufacturing_orders(limit=5)
+        if new_of:
+            for of in new_of:
+                name_of = of.get("name", "N/A")
+                create_date = of.get("create_date", "")[:10]
+                tk.Label(new_of_frame, text=f"• {name_of} (Créé: {create_date})",
+                         bg="#1b1f3b", fg="white", font=("Arial", 12)).pack(anchor="w", padx=10, pady=2)
         else:
-            tk.Label(tasks_frame, text="Aucune tâche récente trouvée", bg="#1b1f3b", fg="white",
-                     font=("Arial", 12)).pack(pady=10, padx=10)
+            tk.Label(new_of_frame, text="Aucune nouvelle OF trouvée",
+                     bg="#1b1f3b", fg="white", font=("Arial", 12)).pack(pady=10, padx=10)
+
+        # Sous-section : Nouvelles Commandes
+        new_cmd_frame = tk.Frame(nouveautes_frame, bg="#1b1f3b")
+        new_cmd_frame.pack(side="left", expand=True, fill="both", padx=10, pady=5)
+        tk.Label(new_cmd_frame, text="Nouvelles Commandes", bg="#1b1f3b", fg="white",
+                 font=("Arial", 14, "bold")).pack(pady=10)
+        new_cmd = self.app.odoo.get_new_sales_orders(limit=5)
+        if new_cmd:
+            for order in new_cmd:
+                order_name = order.get("name", "N/A")
+                create_date = order.get("create_date", "")[:10]
+                amount = order.get("amount_total", 0.0)
+                tk.Label(new_cmd_frame, text=f"• {order_name} (Créé: {create_date}) - {amount} €",
+                         bg="#1b1f3b", fg="white", font=("Arial", 12)).pack(anchor="w", padx=10, pady=2)
+        else:
+            tk.Label(new_cmd_frame, text="Aucune nouvelle commande trouvée",
+                     bg="#1b1f3b", fg="white", font=("Arial", 12)).pack(pady=10, padx=10)
 
     def create_kpi_card(self, parent, title, value, color):
-        """
-        Crée un "card" de KPI avec un titre et une valeur.
-        :param parent: widget parent
-        :param title: Titre du KPI (ex: "Commandes")
-        :param value: Valeur du KPI (ex: "320")
-        :param color: Couleur pour la valeur (ex: "#ff9900")
-        :return: un Frame contenant le KPI.
-        """
         frame = tk.Frame(parent, bg="#1b1f3b", width=200, height=80)
         frame.pack_propagate(False)
         tk.Label(frame, text=title, bg="#1b1f3b", fg="white",
@@ -438,8 +434,6 @@ class HomePage(tk.Frame):
         tk.Label(frame, text=value, bg="#1b1f3b", fg=color,
                  font=("Arial", 16, "bold")).pack()
         return frame
-
-
 
 
 class CompanyPage(tk.Frame):
@@ -720,6 +714,51 @@ class UpdateQtyPage(tk.Frame):
             messagebox.showinfo("Succès", f"OF '{mo_name_str}' mis à jour.")
         else:
             messagebox.showerror("Erreur", f"Impossible de mettre à jour l'OF '{mo_name_str}'.")
+
+class OrderDetailsWindow(tk.Toplevel):
+    def __init__(self, app, order_details):
+        super().__init__()
+        self.app = app
+        self.order_details = order_details
+        self.title("Détails de l'OF")
+        self.geometry("400x300")
+        
+        # Affichage du nom de l'OF
+        tk.Label(self, text=f"OF : {order_details.get('name', '')}",
+                 font=("Arial", 16, "bold")).pack(pady=10)
+        
+        # Affichage des quantités
+        tk.Label(self, text=f"Qté demandée : {order_details.get('product_qty', 0)}",
+                 font=("Arial", 12)).pack(pady=5)
+        tk.Label(self, text="Qté produite :", font=("Arial", 12)).pack(pady=5)
+        
+        self.qty_var = tk.StringVar(value=str(order_details.get("qty_producing", 0)))
+        tk.Entry(self, textvariable=self.qty_var, font=("Arial", 12)).pack(pady=5)
+        
+        # (Optionnel) Affichage des composants de la commande
+        move_ids = order_details.get("move_raw_ids", [])
+        tk.Label(self, text=f"Nombre de composants : {len(move_ids)}",
+                 font=("Arial", 12)).pack(pady=5)
+        # Ici, vous pourriez faire une boucle pour afficher chaque composant avec plus de détails.
+        
+        # Bouton pour valider la mise à jour
+        tk.Button(self, text="Valider la commande", font=("Arial", 12, "bold"),
+                  bg="#3047ff", fg="white", command=self.validate_order).pack(pady=20)
+    
+    def validate_order(self):
+        try:
+            new_qty = float(self.qty_var.get())
+        except ValueError:
+            messagebox.showerror("Erreur", "Quantité invalide.")
+            return
+        mo_name = self.order_details.get("name", "")
+        ok = self.app.odoo.update_mo_quantity_by_name(mo_name, new_qty)
+        if ok:
+            messagebox.showinfo("Succès", f"OF '{mo_name}' mise à jour.")
+            self.destroy()
+        else:
+            messagebox.showerror("Erreur", f"Impossible de mettre à jour l'OF '{mo_name}'.")
+
 
 
 
