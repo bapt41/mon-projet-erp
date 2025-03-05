@@ -133,7 +133,7 @@ Le fichier `main.py` contient l'application Tkinter, structurée en plusieurs pa
 - `DOCS/rapports.md` : Documentation technique.
 
 ## Auteurs
-- **Votre Nom** – [Votre Profil GitHub](https://github.com/votre_nom_utilisateur)
+- **Nino Marquet** **Baptiste Sottejeau** **Nicolas Klein** 
 
 ## Licence
 Ce projet est sous licence MIT.
