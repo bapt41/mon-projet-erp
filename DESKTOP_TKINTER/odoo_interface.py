@@ -16,6 +16,7 @@ class IF_Odoo:
       - Mettre à jour la quantité produite d'un OF en recherchant par son nom.
       - Récupérer les nouveautés (dernières OF et commandes).
       - Sauvegarder l'image d'un produit.
+      - Récupérer le profil utilisateur.
     """
 
     def __init__(self, host, port, db, user, pwd):
@@ -278,3 +279,23 @@ class IF_Odoo:
         except Exception as e:
             print(f"[IF_Odoo] Erreur save_product_image : {e}")
             return False
+
+    def get_user_profile(self):
+        """
+        Récupère les informations du profil de l'utilisateur connecté (res.users).
+        Retourne un dictionnaire contenant notamment 'name', 'image_1920' et 'share'.
+        Le champ 'share' est True pour les utilisateurs non administrateurs.
+        """
+        if not self.models:
+            return {}
+        try:
+            user = self.models.execute_kw(
+                self.db, self.uid, self.pwd,
+                'res.users', 'search_read',
+                [[('id', '=', self.uid)]],
+                {'fields': ['name', 'image_1920', 'share'], 'limit': 1}
+            )
+            return user[0] if user else {}
+        except Exception as e:
+            print(f"[IF_Odoo] Erreur get_user_profile : {e}")
+            return {}

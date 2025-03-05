@@ -43,7 +43,7 @@ class LoginPage:
             label_bg = tk.Label(self.root, image=bg_photo)
             label_bg.image = bg_photo
             label_bg.pack(fill="both", expand=True)
-        except:
+        except Exception as e:
             self.root.configure(bg="white")
 
         # ----------- Frame de login -----------
@@ -85,7 +85,6 @@ class LoginPage:
         # ----------- Username -----------
         tk.Label(self.lgn_frame, text="Username", bg="#040405", fg="#4f4e4d",
                  font=("yu gothic ui", 13, "bold")).place(x=550, y=300)
-
         self.username_entry = tk.Entry(
             self.lgn_frame, textvariable=self.username_var,
             highlightthickness=0, relief=tk.FLAT,
@@ -93,7 +92,6 @@ class LoginPage:
             insertbackground="#6b6a69"
         )
         self.username_entry.place(x=580, y=335, width=270)
-
         tk.Canvas(self.lgn_frame, width=300, height=2.0, bg="#bdb9b1",
                   highlightthickness=0).place(x=550, y=359)
 
@@ -108,7 +106,6 @@ class LoginPage:
         # ----------- Password -----------
         tk.Label(self.lgn_frame, text="Password", bg="#040405", fg="#4f4e4d",
                  font=("yu gothic ui", 13, "bold")).place(x=550, y=380)
-
         self.password_entry = tk.Entry(
             self.lgn_frame, textvariable=self.password_var,
             highlightthickness=0, relief=tk.FLAT,
@@ -116,7 +113,6 @@ class LoginPage:
             show="*", insertbackground="#6b6a69"
         )
         self.password_entry.place(x=580, y=416, width=244)
-
         tk.Canvas(self.lgn_frame, width=300, height=2.0, bg="#bdb9b1",
                   highlightthickness=0).place(x=550, y=440)
 
@@ -155,7 +151,6 @@ class LoginPage:
             btn1_label = tk.Label(self.lgn_frame, image=btn1_photo, bg="#040405")
             btn1_label.image = btn1_photo
             btn1_label.place(x=550, y=450)
-
             self.login_btn = tk.Button(
                 btn1_label, text='LOGIN',
                 font=("yu gothic ui", 13, "bold"),
@@ -166,7 +161,6 @@ class LoginPage:
             self.login_btn.place(x=20, y=10)
             self._btn1_photo = btn1_photo
         except:
-            # Fallback si pas d'image
             self.login_btn = tk.Button(
                 self.lgn_frame, text='LOGIN',
                 font=("yu gothic ui", 13, "bold"),
@@ -200,14 +194,10 @@ class LoginPage:
         """ Méthode de connexion Odoo (F1). """
         username = self.username_var.get()
         password = self.password_var.get()
-
-        # Connexion à Odoo
         odoo_conn = IF_Odoo(self.host, self.port, self.db, username, password)
         success = odoo_conn.connect()
         if success:
-            # Fermer la fenêtre de login
             self.root.destroy()
-            # Ouvrir la fenêtre principale (Dashboard)
             app = DashboardApp(odoo_conn)
             app.mainloop()
         else:
@@ -219,42 +209,77 @@ class LoginPage:
 ##############################################################################
 class DashboardApp(tk.Tk):
     """
-    Fenêtre principale : barre du haut, barre latérale, pages internes (F2-F5).
+    Fenêtre principale de l'application ERP Odoo.
+    Affiche une barre du haut avec le titre, la photo de profil (clic pour se déconnecter),
+    une barre latérale pour la navigation et la zone principale pour les pages.
     """
     def __init__(self, odoo_conn):
         super().__init__()
         self.odoo = odoo_conn
         self.title("ERP Odoo - Production Dashboard")
         self.geometry("1280x720")
-        self.configure(bg="#10142c")  # Couleur de fond principale
-
+        self.configure(bg="#10142c")
         script_dir = os.path.dirname(os.path.abspath(__file__))
         self.img_dir = os.path.join(script_dir, "images")
 
-        # ---------- Barre du haut (top bar) ----------
+        # ---------- Barre du haut ----------
         self.top_bar = tk.Frame(self, bg="#1b1f3b", height=60)
         self.top_bar.pack(side="top", fill="x")
 
-        # Titre à gauche
+        # Titre
         self.title_label = tk.Label(
-            self.top_bar, text="ERP Odoo Dashboard",
-            font=("Arial", 16, "bold"), fg="white", bg="#1b1f3b"
+            self.top_bar,
+            text="ERP Odoo Dashboard",
+            font=("Arial", 16, "bold"),
+            fg="white",
+            bg="#1b1f3b"
         )
         self.title_label.pack(side="left", padx=20)
 
-        # Label “Compte” à droite (optionnel)
-        self.account_label = tk.Label(
-            self.top_bar, text="Connecté", font=("Arial", 12),
-            fg="white", bg="#1b1f3b"
-        )
-        self.account_label.pack(side="right", padx=20)
+        # Récupération du profil utilisateur
+        profile = self.odoo.get_user_profile()
+        # Charger la photo de profil si disponible
+        self.profile_photo = None
+        if profile.get("image_1920"):
+            try:
+                from io import BytesIO
+                import base64
+                image_data = base64.b64decode(profile["image_1920"])
+                img = Image.open(BytesIO(image_data))
+                img = img.resize((40, 40), Image.Resampling.LANCZOS)
+                self.profile_photo = ImageTk.PhotoImage(img)
+            except Exception as e:
+                print("Erreur lors du chargement de l'image de profil:", e)
 
-        # ---------- Barre latérale (sidebar) ----------
+        # Bouton profil : affiche la photo et le nom, et gère le clic
+        self.profile_button = tk.Button(
+            self.top_bar,
+            image=self.profile_photo,
+            text=profile.get("name", "Utilisateur"),
+            compound="left",
+            font=("Arial", 12),
+            fg="white",
+            bg="#1b1f3b",
+            activebackground="#1b1f3b",
+            bd=0,
+            command=self.on_profile_click
+        )
+        self.profile_button.pack(side="right", padx=20)
+
+        # Label complémentaire (optionnel)
+        self.account_label = tk.Label(
+            self.top_bar,
+            text="Connecté",
+            font=("Arial", 12),
+            fg="white",
+            bg="#1b1f3b"
+        )
+        self.account_label.pack(side="right", padx=10)
+
+        # ---------- Barre latérale ----------
         self.sidebar = tk.Frame(self, bg="#16193c", width=200)
         self.sidebar.pack(side="left", fill="y")
 
-        # Boutons du sidebar
-        # On charge éventuellement des icônes
         def load_icon(filename, size=(24,24)):
             path = os.path.join(self.img_dir, filename)
             if os.path.exists(path):
@@ -262,98 +287,130 @@ class DashboardApp(tk.Tk):
                 return ImageTk.PhotoImage(icon_img)
             return None
 
-        home_icon   = load_icon("home.png")
-        comp_icon   = load_icon("fiche entreprise.png")
-        prod_icon   = load_icon("liste produits.png")
-        order_icon  = load_icon("Ordres de Fabrication.png")
-        qty_icon    = load_icon("modification de la quantité produite.png")
-
+        home_icon = load_icon("home.png")
+        comp_icon = load_icon("fiche entreprise.png")
+        prod_icon = load_icon("liste produits.png")
+        order_icon = load_icon("Ordres de Fabrication.png")
+        
+        # Bouton Accueil
         btn_home = tk.Button(
-            self.sidebar, text=" Accueil", image=home_icon, compound="left",
-            bg="#16193c", fg="white", font=("Arial", 13),
-            bd=0, padx=10, pady=10, anchor="w",
+            self.sidebar,
+            text=" Accueil",
+            image=home_icon,
+            compound="left",
+            bg="#16193c",
+            fg="white",
+            font=("Arial", 13),
+            bd=0,
+            padx=10,
+            pady=10,
+            anchor="w",
             command=lambda: self.show_frame("HomePage")
         )
-        btn_home._icon = home_icon
+        btn_home._icon = home_icon  # Conserver la référence
         btn_home.pack(fill="x")
 
+        # Bouton Entreprise
         btn_company = tk.Button(
-            self.sidebar, text=" Entreprise", image=comp_icon, compound="left",
-            bg="#16193c", fg="white", font=("Arial", 13),
-            bd=0, padx=10, pady=10, anchor="w",
+            self.sidebar,
+            text=" Entreprise",
+            image=comp_icon,
+            compound="left",
+            bg="#16193c",
+            fg="white",
+            font=("Arial", 13),
+            bd=0,
+            padx=10,
+            pady=10,
+            anchor="w",
             command=lambda: self.show_frame("CompanyPage")
         )
         btn_company._icon = comp_icon
         btn_company.pack(fill="x")
 
+        # Bouton Produits
         btn_products = tk.Button(
-            self.sidebar, text=" Produits", image=prod_icon, compound="left",
-            bg="#16193c", fg="white", font=("Arial", 13),
-            bd=0, padx=10, pady=10, anchor="w",
+            self.sidebar,
+            text=" Produits",
+            image=prod_icon,
+            compound="left",
+            bg="#16193c",
+            fg="white",
+            font=("Arial", 13),
+            bd=0,
+            padx=10,
+            pady=10,
+            anchor="w",
             command=lambda: self.show_frame("ProductsPage")
         )
         btn_products._icon = prod_icon
         btn_products.pack(fill="x")
 
+        # Bouton Ordres de Fabrication
         btn_orders = tk.Button(
-            self.sidebar, text=" Ordres Fab", image=order_icon, compound="left",
-            bg="#16193c", fg="white", font=("Arial", 13),
-            bd=0, padx=10, pady=10, anchor="w",
+            self.sidebar,
+            text=" Ordres Fab",
+            image=order_icon,
+            compound="left",
+            bg="#16193c",
+            fg="white",
+            font=("Arial", 13),
+            bd=0,
+            padx=10,
+            pady=10,
+            anchor="w",
             command=lambda: self.show_frame("OrdersPage")
         )
         btn_orders._icon = order_icon
         btn_orders.pack(fill="x")
 
-        btn_update = tk.Button(
-            self.sidebar, text=" Modifier Qté", image=qty_icon, compound="left",
-            bg="#16193c", fg="white", font=("Arial", 13),
-            bd=0, padx=10, pady=10, anchor="w",
-            command=lambda: self.show_frame("UpdateQtyPage")
-        )
-        btn_update._icon = qty_icon
-        btn_update.pack(fill="x")
-
         # ---------- Zone principale (pages) ----------
         self.content_frame = tk.Frame(self, bg="#10142c")
         self.content_frame.pack(side="right", fill="both", expand=True)
 
-        # Création des frames/pages
+        # Création des pages (HomePage, CompanyPage, ProductsPage, OrdersPage)
+        # Note : ces classes doivent être définies dans votre fichier.
         self.frames = {}
-        for PageClass in (HomePage, CompanyPage, ProductsPage, OrdersPage, UpdateQtyPage):
+        for PageClass in (HomePage, CompanyPage, ProductsPage, OrdersPage):
             page = PageClass(self.content_frame, self)
             self.frames[PageClass.__name__] = page
             page.place(x=0, y=0, relwidth=1, relheight=1)
 
-        # Page d’accueil par défaut
+        # Afficher la page d'accueil par défaut
         self.show_frame("HomePage")
+
+    def on_profile_click(self):
+        """ Gère le clic sur le profil : affiche une boîte de dialogue pour déconnexion et montre si l'utilisateur est admin. """
+        profile = self.odoo.get_user_profile()
+        is_admin = not profile.get("share", True)  
+        admin_text = "" if is_admin else "Utilisateur"
+        choix = messagebox.askquestion("Profil", f"{profile.get('name', 'Utilisateur')} ({admin_text})\nVoulez-vous vous déconnecter ?")
+        if choix == 'yes':
+            self.destroy()
+            LoginPage(tk.Tk()).root.mainloop()
 
     def show_frame(self, page_name):
         """ Affiche la page demandée en la mettant au premier plan. """
-        frame = self.frames[page_name]
-        frame.tkraise()
+        frame = self.frames.get(page_name)
+        if frame:
+            frame.tkraise()
+        else:
+            print(f"[DashboardApp] La page '{page_name}' n'existe pas.")
 
 
 ##############################################################################
-#                          Pages (F2-F5 + Home)                              #
+#                          Pages (Home, Company, Products, Orders)           #
 ##############################################################################
-
 class HomePage(tk.Frame):
     """
-    Page d'accueil / Tableau de bord.
-    Affiche plusieurs indicateurs récupérés depuis Odoo :
-      - Date du jour
-      - Utilisateur connecté
-      - Informations sur l'entreprise (nom)
-      - Nombre de commandes clients
-      - Nombre de produits
-      - Nombre d'OF en cours
-      - Nouveautés : dernières OF et dernières commandes
+    Tableau de bord d'entreprise.
+    Affiche la date, l'utilisateur connecté, des KPI et une section Nouveautés.
     """
     def __init__(self, parent, app):
         super().__init__(parent, bg="#10142c")
         self.app = app
 
-        # 1) Barre de titre avec la date
+        # Barre de titre avec la date
         title_frame = tk.Frame(self, bg="#10142c")
         title_frame.pack(fill="x", pady=10)
         tk.Label(title_frame, text="Tableau de bord d'entreprise",
@@ -366,15 +423,15 @@ class HomePage(tk.Frame):
                  bg="#10142c", fg="white", font=("Arial", 14)
         ).pack(side="right", padx=20)
 
-        # 2) Infos sur l'utilisateur
+        # Infos sur l'utilisateur
         user_name = self.app.odoo.user or "Utilisateur"
         user_frame = tk.Frame(self, bg="#1b1f3b")
-        user_frame.pack(fill="x", padx=20, pady=(0, 10))
+        user_frame.pack(fill="x", padx=20, pady=(0,10))
         tk.Label(user_frame, text=f"Connecté en tant que : {user_name}",
                  bg="#1b1f3b", fg="white", font=("Arial", 12, "bold")
         ).pack(side="left", padx=10, pady=10)
 
-        # 3) Section KPI
+        # Section KPI
         kpi_frame = tk.Frame(self, bg="#10142c")
         kpi_frame.pack(fill="x", padx=20, pady=10)
         company_info = self.app.odoo.get_company_info()
@@ -389,11 +446,11 @@ class HomePage(tk.Frame):
         of_count = len(of_in_progress)
         self.create_kpi_card(kpi_frame, "OF en cours", f"{of_count}", "#9263f9").pack(side="left", expand=True, fill="both", padx=5)
 
-        # 4) Section Nouveautés
+        # Section Nouveautés
         nouveautes_frame = tk.Frame(self, bg="#10142c")
         nouveautes_frame.pack(fill="both", expand=True, padx=20, pady=(10,20))
 
-        # Sous-section : Nouvelles OF
+        # Nouveautés : Nouvelles OF
         new_of_frame = tk.Frame(nouveautes_frame, bg="#1b1f3b")
         new_of_frame.pack(side="left", expand=True, fill="both", padx=10, pady=5)
         tk.Label(new_of_frame, text="Nouvelles OF", bg="#1b1f3b", fg="white",
@@ -409,7 +466,7 @@ class HomePage(tk.Frame):
             tk.Label(new_of_frame, text="Aucune nouvelle OF trouvée",
                      bg="#1b1f3b", fg="white", font=("Arial", 12)).pack(pady=10, padx=10)
 
-        # Sous-section : Nouvelles Commandes
+        # Nouveautés : Nouvelles Commandes
         new_cmd_frame = tk.Frame(nouveautes_frame, bg="#1b1f3b")
         new_cmd_frame.pack(side="left", expand=True, fill="both", padx=10, pady=5)
         tk.Label(new_cmd_frame, text="Nouvelles Commandes", bg="#1b1f3b", fg="white",
@@ -441,15 +498,11 @@ class CompanyPage(tk.Frame):
     def __init__(self, parent, app):
         super().__init__(parent, bg="#10142c")
         self.app = app
-
         tk.Label(self, text="Fiche Entreprise (F2)", bg="#10142c", fg="white",
                  font=("Arial", 18, "bold")).pack(pady=20)
-
-        # Bouton pour charger
         btn = tk.Button(self, text="Afficher Infos", bg="#3047ff", fg="white",
                         font=("Arial", 12, "bold"), command=self.show_company)
         btn.pack(pady=10)
-
         self.info_label = tk.Label(self, text="", bg="#10142c", fg="white",
                                    font=("Arial", 12), justify="left")
         self.info_label.pack(pady=10)
@@ -459,11 +512,11 @@ class CompanyPage(tk.Frame):
         if not info:
             messagebox.showwarning("Entreprise", "Impossible de récupérer la fiche entreprise.")
             return
-        name   = info.get('name', '')
+        name = info.get('name', '')
         street = info.get('street', '')
-        city   = info.get('city', '')
-        phone  = info.get('phone', '')
-        texte  = f"Nom : {name}\nAdresse : {street}\nVille : {city}\nTéléphone : {phone}"
+        city = info.get('city', '')
+        phone = info.get('phone', '')
+        texte = f"Nom : {name}\nAdresse : {street}\nVille : {city}\nTéléphone : {phone}"
         self.info_label.config(text=texte)
 
 
@@ -472,84 +525,50 @@ class ProductsPage(tk.Frame):
     def __init__(self, parent, app):
         super().__init__(parent, bg="#10142c")
         self.app = app
-
-        # Label titre
         tk.Label(self, text="Liste des Produits (F3)",
                  bg="#10142c", fg="white", font=("Arial", 18, "bold")).pack(pady=20)
-
-        # Bouton pour charger les produits
         btn = tk.Button(self, text="Charger Produits", bg="#3047ff", fg="white",
                         font=("Arial", 12, "bold"), command=self.show_products)
         btn.pack(pady=10)
-
-        # --- Création d'une zone scrollable (verticale) ---
         container = tk.Frame(self, bg="#10142c")
         container.pack(fill="both", expand=True, padx=20, pady=10)
-
         self.canvas = tk.Canvas(container, bg="#10142c", highlightthickness=0)
         self.scrollbar = tk.Scrollbar(container, orient="vertical", command=self.canvas.yview)
-
-        # On crée un frame qui contiendra les tuiles, et qu'on placera dans le Canvas
         self.scrollable_frame = tk.Frame(self.canvas, bg="#10142c")
-
-        # Pour que .grid() fonctionne correctement, on peut configurer les colonnes
-        # (si vous voulez 3 colonnes, vous pouvez faire 3 .grid_columnconfigure(...))
         for col_index in range(3):
             self.scrollable_frame.grid_columnconfigure(col_index, weight=1, pad=10)
-
-        # On relie l'événement <Configure> pour ajuster la scrollregion
         self.scrollable_frame.bind(
             "<Configure>",
             lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
         )
-
-        # On place la scrollable_frame dans le canvas
         self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
-
         self.canvas.pack(side="left", fill="both", expand=True)
         self.scrollbar.pack(side="right", fill="y")
-
-        # Pour garder les références d'images
         self.product_images = []
 
     def show_products(self):
-        # Vider le contenu existant
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
         self.product_images.clear()
-
-        # Récupérer les produits
         products = self.app.odoo.get_products()
         if not products:
             messagebox.showinfo("Produits", "Aucun produit trouvé.")
             return
-
-        # Nombre de colonnes qu'on souhaite (par exemple 3)
         num_cols = 3
-
         for idx, prod in enumerate(products):
-            name  = prod.get("name", "N/A")
+            name = prod.get("name", "N/A")
             price = prod.get("list_price", 0.0)
             categ_id = prod.get("categ_id", False)
             category_name = ""
             if isinstance(categ_id, list) and len(categ_id) == 2:
                 category_name = categ_id[1]
             description = prod.get("description_sale", "")
-
             image_b64 = prod.get("image_1920", False)
-
-            # On calcule la row/column pour ce produit
             row = idx // num_cols
             col = idx % num_cols
-
-            # Frame “tuile”
             tile_frame = tk.Frame(self.scrollable_frame, bg="#1b1f3b", bd=2, relief="groove")
-
-            # Au lieu de pack(), on place la tuile avec grid()
             tile_frame.grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
-
-            # Décoder l'image si présente
             if image_b64:
                 import base64
                 from io import BytesIO
@@ -559,16 +578,12 @@ class ProductsPage(tk.Frame):
                 photo = ImageTk.PhotoImage(img_PIL)
             else:
                 photo = None
-
             if photo:
                 self.product_images.append(photo)
                 img_label = tk.Label(tile_frame, image=photo, bg="#1b1f3b")
                 img_label.pack(side="top", padx=10, pady=10)
-
-            # Frame pour le texte
             text_frame = tk.Frame(tile_frame, bg="#1b1f3b")
             text_frame.pack(side="top", fill="both", expand=True, padx=10, pady=10)
-
             tk.Label(text_frame, text=f"Name: {name}",
                      bg="#1b1f3b", fg="white", font=("Arial", 12, "bold")).pack(anchor="w")
             tk.Label(text_frame, text=f"Price: {price}",
@@ -579,10 +594,8 @@ class ProductsPage(tk.Frame):
                      bg="#1b1f3b", fg="white", font=("Arial", 12)).pack(anchor="w")
 
 
-
-
 class OrdersPage(tk.Frame):
-    """ F4 : Afficher la liste des Ordres de Fabrication filtrables par état. """
+    """ F4 : Afficher la liste des Ordres de Fabrication filtrables par état et permettre le double-clic pour modifier. """
     def __init__(self, parent, app):
         super().__init__(parent, bg="#10142c")
         self.app = app
@@ -592,7 +605,6 @@ class OrdersPage(tk.Frame):
 
         filter_frame = tk.Frame(self, bg="#10142c")
         filter_frame.pack(pady=10)
-
         tk.Label(filter_frame, text="État OF :", bg="#10142c", fg="white",
                  font=("Arial", 12)).pack(side="left", padx=5)
 
@@ -616,7 +628,6 @@ class OrdersPage(tk.Frame):
 
         tree_frame = tk.Frame(self, bg="#10142c")
         tree_frame.pack(fill="both", expand=True, padx=20, pady=10)
-
         columns = ("name", "qty", "produced", "state")
         self.tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=15)
         self.tree.heading("name", text="Nom OF")
@@ -637,13 +648,14 @@ class OrdersPage(tk.Frame):
             "cancel": "Annulé"
         }
 
+        # Lier le double-clic pour ouvrir la fenêtre de détails
+        self.tree.bind("<Double-1>", self.on_double_click)
+
     def show_of(self):
-        # Vider le Treeview
         for row in self.tree.get_children():
             self.tree.delete(row)
-        # Obtenir l'état sélectionné et sa valeur Odoo correspondante
-        state_label = self.selected_state.get()  # ex: "Tout", "Confirmé", etc.
-        state_value = self.state_options.get(state_label)  # ex: "all", "confirmed", etc.
+        state_label = self.selected_state.get()
+        state_value = self.state_options.get(state_label)
         orders = self.app.odoo.get_manufacturing_orders(state_filter=state_value)
         if not orders:
             messagebox.showinfo("OF", "Aucun ordre trouvé.")
@@ -653,67 +665,21 @@ class OrdersPage(tk.Frame):
             qty = of.get("product_qty", 0.0)
             produced = of.get("qty_producing", 0.0)
             state_of = of.get("state", "")
-            # Traduire le code d'état en libellé français
             display_state = self.state_labels.get(state_of, state_of)
             self.tree.insert("", tk.END, values=(name_of, qty, produced, display_state))
 
-
-
-
-class UpdateQtyPage(tk.Frame):
-    """
-    F5 : Mettre à jour la quantité produite d'un OF en saisissant le NOM (ex: "MO/00014").
-    """
-    def __init__(self, parent, app):
-        super().__init__(parent, bg="#10142c")
-        self.app = app
-
-        title = tk.Label(self, text="Modifier Qté Produite (F5)",
-                         bg="#10142c", fg="white", font=("Arial", 18, "bold"))
-        title.pack(pady=20)
-
-        # Fields
-        form_frame = tk.Frame(self, bg="#10142c")
-        form_frame.pack(pady=40)
-
-        tk.Label(form_frame, text="Nom de l'OF :", bg="#10142c", fg="white",
-                 font=("Arial", 12)).grid(row=0, column=0, padx=5, pady=5, sticky="e")
-        self.mo_name_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=self.mo_name_var).grid(row=0, column=1, padx=5, pady=5)
-
-        tk.Label(form_frame, text="Nouvelle quantité :", bg="#10142c", fg="white",
-                 font=("Arial", 12)).grid(row=1, column=0, padx=5, pady=5, sticky="e")
-        self.qty_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=self.qty_var).grid(row=1, column=1, padx=5, pady=5)
-
-        # Button
-        update_btn = tk.Button(
-            self, text="Mettre à jour",
-            bg="#3047ff", fg="white", font=("Arial", 12, "bold"),
-            command=self.update_of_qty
-        )
-        update_btn.pack()
-
-    def update_of_qty(self):
-        mo_name_str = self.mo_name_var.get().strip()
-        if not mo_name_str:
+    def on_double_click(self, event):
+        selected = self.tree.selection()
+        if not selected:
             return
-
-        new_qty_str = self.qty_var.get().strip()
-        if not new_qty_str:
-            return
-        try:
-            new_qty = float(new_qty_str)
-        except ValueError:
-            messagebox.showerror("Erreur", "Quantité invalide.")
-            return
-
-        # Appel à la méthode qui met à jour en cherchant par name
-        ok = self.app.odoo.update_mo_quantity_by_name(mo_name_str, new_qty)
-        if ok:
-            messagebox.showinfo("Succès", f"OF '{mo_name_str}' mis à jour.")
+        values = self.tree.item(selected[0])['values']
+        mo_name = values[0]
+        details = self.app.odoo.get_manufacturing_order_details_by_name(mo_name)
+        if details:
+            OrderDetailsWindow(self.app, details)
         else:
-            messagebox.showerror("Erreur", f"Impossible de mettre à jour l'OF '{mo_name_str}'.")
+            messagebox.showerror("Erreur", "Détails non trouvés pour cette OF.")
+
 
 class OrderDetailsWindow(tk.Toplevel):
     def __init__(self, app, order_details):
@@ -723,11 +689,8 @@ class OrderDetailsWindow(tk.Toplevel):
         self.title("Détails de l'OF")
         self.geometry("400x300")
         
-        # Affichage du nom de l'OF
         tk.Label(self, text=f"OF : {order_details.get('name', '')}",
                  font=("Arial", 16, "bold")).pack(pady=10)
-        
-        # Affichage des quantités
         tk.Label(self, text=f"Qté demandée : {order_details.get('product_qty', 0)}",
                  font=("Arial", 12)).pack(pady=5)
         tk.Label(self, text="Qté produite :", font=("Arial", 12)).pack(pady=5)
@@ -735,13 +698,10 @@ class OrderDetailsWindow(tk.Toplevel):
         self.qty_var = tk.StringVar(value=str(order_details.get("qty_producing", 0)))
         tk.Entry(self, textvariable=self.qty_var, font=("Arial", 12)).pack(pady=5)
         
-        # (Optionnel) Affichage des composants de la commande
         move_ids = order_details.get("move_raw_ids", [])
         tk.Label(self, text=f"Nombre de composants : {len(move_ids)}",
                  font=("Arial", 12)).pack(pady=5)
-        # Ici, vous pourriez faire une boucle pour afficher chaque composant avec plus de détails.
         
-        # Bouton pour valider la mise à jour
         tk.Button(self, text="Valider la commande", font=("Arial", 12, "bold"),
                   bg="#3047ff", fg="white", command=self.validate_order).pack(pady=20)
     
@@ -758,9 +718,6 @@ class OrderDetailsWindow(tk.Toplevel):
             self.destroy()
         else:
             messagebox.showerror("Erreur", f"Impossible de mettre à jour l'OF '{mo_name}'.")
-
-
-
 
 
 ##############################################################################
