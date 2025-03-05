@@ -120,7 +120,7 @@ Dans le dossier `ODOO`, utilisez Docker Compose pour déployer Odoo et PostgreSQ
 ```sh
 docker-compose up -d
 ```
-Accédez à Odoo via [http://localhost:8069](http://localhost:8069).
+Accédez à Odoo via [http://172.31.10.137:8027](http://172.31.10.137:8027).
 
 ## Développement de l’Interface Python
 La communication avec Odoo se fait via XML-RPC dans `odoo_interface.py`. Vous pouvez modifier ou étendre les méthodes de cette interface.
