@@ -384,7 +384,7 @@ class DashboardApp(tk.Tk):
         profile = self.odoo.get_user_profile()
         is_admin = not profile.get("share", True)  
         admin_text = "" if is_admin else "Utilisateur"
-        choix = messagebox.askquestion("Profil", f"{profile.get('name', 'Utilisateur')} ({admin_text})\nVoulez-vous vous déconnecter ?")
+        choix = messagebox.askquestion("Profil", f"{profile.get('name', 'Utilisateur')} {admin_text}\nVoulez-vous vous déconnecter ?")
         if choix == 'yes':
             self.destroy()
             LoginPage(tk.Tk()).root.mainloop()
