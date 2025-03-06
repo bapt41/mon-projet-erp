@@ -539,7 +539,7 @@ class HomePage(tk.Frame):
 
 
 class CompanyPage(tk.Frame):
-    """ F2 : Afficher la fiche Entreprise depuis Odoo, avec le logo de la boîte. """
+    """ F2 : Afficher la fiche Entreprise depuis Odoo, avec un logo fixe. """
     def __init__(self, parent, app):
         super().__init__(parent, bg="#10142c")
         self.app = app
@@ -547,12 +547,11 @@ class CompanyPage(tk.Frame):
         tk.Label(self, text="Fiche Entreprise (F2)", bg="#10142c", fg="white",
                  font=("Arial", 18, "bold")).pack(pady=20)
 
-        # Bouton pour charger les infos
         btn = tk.Button(self, text="Afficher Infos", bg="#3047ff", fg="white",
                         font=("Arial", 12, "bold"), command=self.show_company)
         btn.pack(pady=10)
 
-        # Espace pour le logo
+        # Label pour afficher le logo
         self.logo_label = tk.Label(self, bg="#10142c")
         self.logo_label.pack(pady=10)
 
@@ -562,49 +561,35 @@ class CompanyPage(tk.Frame):
         self.info_label.pack(pady=10)
 
     def show_company(self):
-        info = self.app.odoo.get_company_info()
-        if not info:
-            messagebox.showwarning("Entreprise", "Impossible de récupérer la fiche entreprise.")
-            return
-
-        # Récupérer et afficher le logo (ici on utilise le champ "image_1920")
-        logo_data = info.get("image_1920")
-        if logo_data:
+        # Chargement du logo depuis un fichier fixe
+        logo_path = "/home/user/erp/mon-projet-erp/DESKTOP_TKINTER/images/Logo BikeLab.jpg"
+        if os.path.exists(logo_path):
             try:
-                import base64
-                from io import BytesIO
-                image_data = base64.b64decode(logo_data)
-                img = Image.open(BytesIO(image_data))
-                # Redimensionner le logo pour l'affichage (par exemple 150x150 pixels)
+                img = Image.open(logo_path)
+                # Redimensionner le logo selon vos besoins (ici, 150x150 pixels)
                 img = img.resize((150, 150), Image.Resampling.LANCZOS)
                 logo_photo = ImageTk.PhotoImage(img)
                 self.logo_label.config(image=logo_photo, text="")
-                self.logo_label.image = logo_photo  # conserver la référence
+                self.logo_label.image = logo_photo  # Conserver la référence
             except Exception as e:
-                print("Erreur lors du chargement du logo:", e)
+                print("Erreur lors du chargement du logo fixe:", e)
                 self.logo_label.config(text="Logo non disponible")
         else:
-            self.logo_label.config(text="Logo non disponible")
+            self.logo_label.config(text="Logo introuvable")
 
-        # Afficher les autres informations
-        name = info.get('name', '')
-        street = info.get('street', '')
-        city = info.get('city', '')
-        phone = info.get('phone', '')
-        texte = f"Nom : {name}\nAdresse : {street}\nVille : {city}\nTéléphone : {phone}"
-        self.info_label.config(text=texte)
-
-    def show_company(self):
+        # Récupérer les informations de l'entreprise depuis Odoo
         info = self.app.odoo.get_company_info()
         if not info:
             messagebox.showwarning("Entreprise", "Impossible de récupérer la fiche entreprise.")
             return
+
         name = info.get('name', '')
         street = info.get('street', '')
         city = info.get('city', '')
         phone = info.get('phone', '')
         texte = f"Nom : {name}\nAdresse : {street}\nVille : {city}\nTéléphone : {phone}"
         self.info_label.config(text=texte)
+
 
 
 class ProductsPage(tk.Frame):

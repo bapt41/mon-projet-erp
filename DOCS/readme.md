@@ -102,7 +102,8 @@ python main.py
 ```
 
 ### Interface de Connexion
-Entrez vos identifiants Odoo pour vous connecter.
+baptiste.sottejeau@gmail.com
+portainer3556
 
 ### Tableau de Bord
 Une fois connecté, le tableau de bord affiche :
