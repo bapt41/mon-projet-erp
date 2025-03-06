@@ -270,7 +270,7 @@ class DashboardApp(tk.Tk):
             except Exception as e:
                 print("Erreur lors du chargement de l'image de profil:", e)
 
-        # Bouton profil : affiche la photo et le nom, et gère le clic pour déconnexion
+        # Bouton profil
         self.profile_button = tk.Button(
             self.top_bar,
             image=self.profile_photo,
@@ -327,7 +327,7 @@ class DashboardApp(tk.Tk):
             anchor="w",
             command=lambda: self.show_frame("HomePage")
         )
-        btn_home._icon = home_icon  # Conserver la référence
+        btn_home._icon = home_icon
         btn_home.pack(fill="x")
 
         btn_company = tk.Button(
@@ -385,7 +385,7 @@ class DashboardApp(tk.Tk):
         self.content_frame = tk.Frame(self, bg="#10142c")
         self.content_frame.pack(side="right", fill="both", expand=True)
 
-        # Création des pages (HomePage, CompanyPage, ProductsPage, OrdersPage)
+        # Création des pages
         self.frames = {}
         for PageClass in (HomePage, CompanyPage, ProductsPage, OrdersPage):
             try:
@@ -398,13 +398,12 @@ class DashboardApp(tk.Tk):
         self.show_frame("HomePage")
 
         # Démarrer la surveillance de la connexion
-        self.check_connection()
+        self.after(1000, self.check_connection)  # Démarre après 1 seconde
 
     def on_profile_click(self):
         profile = self.odoo.get_user_profile()
-        is_admin = not profile.get("share", True)  # Si share est False, l'utilisateur est admin
+        is_admin = not profile.get("share", True)
         admin_text = "admin" if is_admin else "Utilisateur"
-        # Vérifier si la fenêtre existe avant d'afficher la boîte de dialogue
         if self.winfo_exists():
             choix = messagebox.askquestion(
                 "Profil",
@@ -412,7 +411,6 @@ class DashboardApp(tk.Tk):
             )
             if choix == 'yes':
                 self.destroy()
-                # Réafficher la page de connexion
                 LoginPage(tk.Tk()).root.mainloop()
 
     def show_frame(self, page_name):
@@ -423,10 +421,10 @@ class DashboardApp(tk.Tk):
             print(f"[DashboardApp] La page '{page_name}' n'existe pas.")
 
     def check_connection(self):
+        """ Vérifie si la connexion à Odoo est toujours active et tente de reconnecter en cas de problème. """
         try:
             _ = self.odoo.get_company_info()
         except Exception as e:
-            # Vérifier si la fenêtre est toujours active
             if self.winfo_exists():
                 try:
                     messagebox.showerror("Erreur de connexion", "La connexion à Odoo a été interrompue.\nL'application va tenter de se reconnecter.")
@@ -437,6 +435,7 @@ class DashboardApp(tk.Tk):
         self.after(10000, self.check_connection)
 
     def try_reconnect(self):
+        """ Tente de reconnecter à Odoo toutes les 5 secondes jusqu'au succès. """
         try:
             if self.odoo.connect():
                 if self.winfo_exists():
@@ -449,7 +448,6 @@ class DashboardApp(tk.Tk):
         except Exception as e:
             print("Erreur lors de la reconnexion :", e)
         self.after(5000, self.try_reconnect)
-        
 
 
 
