@@ -1,4 +1,4 @@
-#05/03/2025
+#06/03/2025
 #!/usr/bin/env python3
 import os
 import tkinter as tk
@@ -776,8 +776,9 @@ class OrderDetailsWindow(tk.Toplevel):
         self.app = app
         self.order_details = order_details
         self.title("Détails de l'OF")
-        self.geometry("500x400")
+        self.geometry("500x600")  # Hauteur augmentée pour afficher la nomenclature
         
+        # Informations générales de l'OF
         tk.Label(self, text=f"OF : {order_details.get('name', '')}",
                  font=("Arial", 16, "bold")).pack(pady=10)
         tk.Label(self, text=f"Qté demandée : {order_details.get('product_qty', 0)}",
@@ -787,29 +788,38 @@ class OrderDetailsWindow(tk.Toplevel):
         self.qty_var = tk.StringVar(value=str(order_details.get("qty_producing", 0)))
         tk.Entry(self, textvariable=self.qty_var, font=("Arial", 12)).pack(pady=5)
         
-        move_ids = order_details.get("move_raw_ids", [])
-        if not move_ids:
-            tk.Label(self, text="Aucun composant défini pour cet OF.",
-                     font=("Arial", 12), fg="red").pack(pady=5)
-        else:
+        # Nouveauté : Affichage de la nomenclature (Bill of Materials)
+        bom_id = order_details.get("bom_id", False)
+        if bom_id:
+            # Si bom_id est une liste [id, name], récupérer l'id
+            if isinstance(bom_id, list) and len(bom_id) == 2:
+                bom_id_val = bom_id[0]
+            else:
+                bom_id_val = bom_id
             try:
-                move_details = self.app.odoo.models.execute_kw(
+                bom_record = self.app.odoo.models.execute_kw(
                     self.app.odoo.db, self.app.odoo.uid, self.app.odoo.pwd,
-                    'stock.move', 'read',
-                    [move_ids],
-                    {'fields': ['name', 'product_uom_qty', 'quantity_done']}
+                    'mrp.bom', 'read', [[bom_id_val]], {'fields': ['bom_line_ids']}
                 )
-                tk.Label(self, text="Composants :", font=("Arial", 12, "bold")).pack(pady=5)
-                for move in move_details:
-                    name = move.get("name", "N/A")
-                    qty_needed = move.get("product_uom_qty", 0)
-                    qty_done = move.get("quantity_done", 0)
-                    tk.Label(self, text=f"- {name}: {qty_done} / {qty_needed}",
-                             font=("Arial", 12)).pack(anchor="w", padx=20, pady=2)
+                if bom_record and bom_record[0].get('bom_line_ids'):
+                    bom_line_ids = bom_record[0]['bom_line_ids']
+                    bom_lines = self.app.odoo.models.execute_kw(
+                        self.app.odoo.db, self.app.odoo.uid, self.app.odoo.pwd,
+                        'mrp.bom.line', 'read', [bom_line_ids], {'fields': ['product_id', 'product_qty']}
+                    )
+                    tk.Label(self, text="Nomenclature (BOM) :", font=("Arial", 12, "bold")).pack(pady=10)
+                    for line in bom_lines:
+                        prod = line.get("product_id", [None, "N/A"])
+                        prod_name = prod[1] if isinstance(prod, list) and len(prod) == 2 else str(prod)
+                        qty = line.get("product_qty", 0)
+                        tk.Label(self, text=f"- {prod_name}: {qty}", font=("Arial", 12)).pack(anchor="w", padx=20, pady=2)
+                else:
+                    tk.Label(self, text="Nomenclature non disponible.", font=("Arial", 12), fg="red").pack(pady=5)
             except Exception as e:
-                tk.Label(self, text="Erreur lors de la récupération des composants.",
-                         font=("Arial", 12), fg="red").pack(pady=5)
-                print("Erreur get_move_details:", e)
+                tk.Label(self, text="Erreur lors de la récupération de la nomenclature.", font=("Arial", 12), fg="red").pack(pady=5)
+                print("Erreur get_bom_details:", e)
+        else:
+            tk.Label(self, text="Aucune nomenclature définie pour cet OF.", font=("Arial", 12), fg="red").pack(pady=5)
         
         tk.Button(self, text="Valider la commande", font=("Arial", 12, "bold"),
                   bg="#3047ff", fg="white", command=self.validate_order).pack(pady=20)
@@ -827,6 +837,7 @@ class OrderDetailsWindow(tk.Toplevel):
             self.destroy()
         else:
             messagebox.showerror("Erreur", f"Impossible de mettre à jour l'OF '{mo_name}'.")
+
 
 
 

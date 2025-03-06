@@ -299,3 +299,24 @@ class IF_Odoo:
         except Exception as e:
             print(f"[IF_Odoo] Erreur get_user_profile : {e}")
             return {}
+    
+    def get_manufacturing_order_details_by_name(self, mo_name):
+        """
+        Récupère les détails d'un Ordre de Fabrication (mrp.production) en recherchant par 'name'.
+        Retourne un dictionnaire avec 'id', 'name', 'product_qty', 'qty_producing', 'move_raw_ids'
+        et 'bom_id' (la nomenclature).
+        """
+        if not self.models:
+            return {}
+        try:
+            recs = self.models.execute_kw(
+                self.db, self.uid, self.pwd,
+                'mrp.production', 'search_read',
+                [[('name', '=', mo_name)]],
+                {'fields': ['id', 'name', 'product_qty', 'qty_producing', 'move_raw_ids', 'bom_id'], 'limit': 1}
+            )
+            return recs[0] if recs else {}
+        except Exception as e:
+            print(f"[IF_Odoo] Erreur get_manufacturing_order_details_by_name : {e}")
+            return {}
+
