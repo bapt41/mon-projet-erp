@@ -102,8 +102,17 @@ python main.py
 ```
 
 ### Interface de Connexion
-baptiste.sottejeau@gmail.com
+baptiste.sottejeau@gmail.com (admin)
 portainer3556
+
+mecanicien.bikelab@yahoo.com (user stock et OF)
+portainer3556  
+
+gestion_des_stock_bikelab@yahoo.com (stock)
+portainer3556
+
+ninomarquet5@gmail.com (admin)
+portainer3556  
 
 ### Tableau de Bord
 Une fois connecté, le tableau de bord affiche :
