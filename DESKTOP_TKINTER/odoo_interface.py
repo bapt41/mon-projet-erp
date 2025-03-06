@@ -319,4 +319,23 @@ class IF_Odoo:
         except Exception as e:
             print(f"[IF_Odoo] Erreur get_manufacturing_order_details_by_name : {e}")
             return {}
+        
+    def get_company_info(self):
+        if not self.models:
+            return {}
+        try:
+            # Ne récupérer que les champs existants
+            comps = self.models.execute_kw(
+                self.db, self.uid, self.pwd,
+                'res.company', 'search_read',
+                [[]],
+                {'fields': ['name', 'street', 'city', 'phone'], 'limit': 1}
+            )
+            return comps[0] if comps else {}
+        except Exception as e:
+            print(f"[IF_Odoo] Erreur get_company_info : {e}")
+            return {}
+
+
+
 

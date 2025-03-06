@@ -550,7 +550,7 @@ class HomePage(tk.Frame):
 
 
 class CompanyPage(tk.Frame):
-    """ F2 : Afficher la fiche Entreprise depuis Odoo, avec un logo fixe. """
+    """ F2 : Afficher la fiche Entreprise depuis Odoo, avec le logo récupéré depuis Odoo. """
     def __init__(self, parent, app):
         super().__init__(parent, bg="#10142c")
         self.app = app
@@ -562,7 +562,7 @@ class CompanyPage(tk.Frame):
                         font=("Arial", 12, "bold"), command=self.show_company)
         btn.pack(pady=10)
 
-        # Label pour afficher le logo
+        # Label pour afficher le logo récupéré depuis Odoo
         self.logo_label = tk.Label(self, bg="#10142c")
         self.logo_label.pack(pady=10)
 
@@ -572,32 +572,49 @@ class CompanyPage(tk.Frame):
         self.info_label.pack(pady=10)
 
     def show_company(self):
-        # Chargement du logo 
-        logo_path = "C:\Users\NinoMarquet-Stirweld\Downloads\mon-projet-erp-main\mon-projet-erp-main\DESKTOP_TKINTER\images\Logo BikeLab.jpg"
-        if os.path.exists(logo_path):
-            try:
-                img = Image.open(logo_path)
-                # Redimensionner le logo selon vos besoins (ici, 150x150 pixels)
-                img = img.resize((150, 150), Image.Resampling.LANCZOS)
-                logo_photo = ImageTk.PhotoImage(img)
-                self.logo_label.config(image=logo_photo, text="")
-                self.logo_label.image = logo_photo  # Conserver la référence
-            except Exception as e:
-                print("Erreur lors du chargement du logo fixe:", e)
-                self.logo_label.config(text="Logo non disponible")
-        else:
-            self.logo_label.config(text="Logo introuvable")
-
-        # Récupérer les informations de l'entreprise depuis Odoo
+        # Tentative de récupérer le logo depuis Odoo (si le champ existe)
         info = self.app.odoo.get_company_info()
         if not info:
             messagebox.showwarning("Entreprise", "Impossible de récupérer la fiche entreprise.")
             return
 
+        # Par défaut, le logo ne sera pas disponible (car image_1920 n'est pas récupéré)
+        # Vous pouvez afficher un message par défaut
+        self.logo_label.config(text="Logo non disponible", image="")
+
+        # Afficher les autres informations
         name = info.get('name', '')
         street = info.get('street', '')
         city = info.get('city', '')
         phone = info.get('phone', '')
+        texte = f"Nom : {name}\nAdresse : {street}\nVille : {city}\nTéléphone : {phone}"
+        self.info_label.config(text=texte)
+
+
+        # Affichage du logo depuis Odoo, s'il est présent
+        logo_data = info.get("image_1920")
+        if logo_data:
+            try:
+                import base64
+                from io import BytesIO
+                image_bytes = base64.b64decode(logo_data)
+                img = Image.open(BytesIO(image_bytes))
+                # Redimensionner le logo (ici 150x150 pixels, ajustez si besoin)
+                img = img.resize((150, 150), Image.Resampling.LANCZOS)
+                logo_photo = ImageTk.PhotoImage(img)
+                self.logo_label.config(image=logo_photo, text="")
+                self.logo_label.image = logo_photo  # Conserver la référence
+            except Exception as e:
+                print("Erreur lors du chargement du logo depuis Odoo:", e)
+                self.logo_label.config(text="Logo non disponible")
+        else:
+            self.logo_label.config(text="Logo non disponible")
+
+        # Affichage des autres informations de l'entreprise
+        name = info.get('name', 'Non disponible')
+        street = info.get('street', 'Non disponible')
+        city = info.get('city', 'Non disponible')
+        phone = info.get('phone', 'Non disponible')
         texte = f"Nom : {name}\nAdresse : {street}\nVille : {city}\nTéléphone : {phone}"
         self.info_label.config(text=texte)
 
