@@ -211,8 +211,9 @@ class LoginPage:
 class DashboardApp(tk.Tk):
     """
     Fenêtre principale de l'application ERP Odoo.
-    Affiche une barre du haut avec le titre, la photo de profil (clic pour se déconnecter),
-    une barre latérale pour la navigation et la zone principale pour les pages.
+    Affiche une barre du haut avec le titre et le profil utilisateur (photo, nom).
+    La barre latérale permet de naviguer entre les pages (HomePage, CompanyPage, ProductsPage, OrdersPage).
+    La classe surveille également la connexion à Odoo et tente une reconnexion en cas de coupure.
     """
     def __init__(self, odoo_conn):
         super().__init__()
@@ -238,7 +239,11 @@ class DashboardApp(tk.Tk):
         self.title_label.pack(side="left", padx=20)
 
         # Récupération du profil utilisateur
-        profile = self.odoo.get_user_profile()
+        try:
+            profile = self.odoo.get_user_profile()
+        except Exception as e:
+            print("Erreur lors de la récupération du profil :", e)
+            profile = {}
         # Charger la photo de profil si disponible
         self.profile_photo = None
         if profile.get("image_1920"):
@@ -252,7 +257,7 @@ class DashboardApp(tk.Tk):
             except Exception as e:
                 print("Erreur lors du chargement de l'image de profil:", e)
 
-        # Bouton profil : affiche la photo et le nom, et gère le clic
+        # Bouton profil : affiche la photo et le nom, et gère le clic pour déconnexion
         self.profile_button = tk.Button(
             self.top_bar,
             image=self.profile_photo,
@@ -267,7 +272,6 @@ class DashboardApp(tk.Tk):
         )
         self.profile_button.pack(side="right", padx=20)
 
-        # Label complémentaire (optionnel)
         self.account_label = tk.Label(
             self.top_bar,
             text="Connecté",
@@ -284,16 +288,18 @@ class DashboardApp(tk.Tk):
         def load_icon(filename, size=(24,24)):
             path = os.path.join(self.img_dir, filename)
             if os.path.exists(path):
-                icon_img = Image.open(path).resize(size, Image.Resampling.LANCZOS)
-                return ImageTk.PhotoImage(icon_img)
+                try:
+                    icon_img = Image.open(path).resize(size, Image.Resampling.LANCZOS)
+                    return ImageTk.PhotoImage(icon_img)
+                except Exception as e:
+                    print(f"Erreur lors du chargement de l'icône {filename}: {e}")
             return None
 
         home_icon = load_icon("home.png")
         comp_icon = load_icon("fiche entreprise.png")
         prod_icon = load_icon("liste produits.png")
         order_icon = load_icon("Ordres de Fabrication.png")
-        
-        # Bouton Accueil
+
         btn_home = tk.Button(
             self.sidebar,
             text=" Accueil",
@@ -311,7 +317,6 @@ class DashboardApp(tk.Tk):
         btn_home._icon = home_icon  # Conserver la référence
         btn_home.pack(fill="x")
 
-        # Bouton Entreprise
         btn_company = tk.Button(
             self.sidebar,
             text=" Entreprise",
@@ -329,7 +334,6 @@ class DashboardApp(tk.Tk):
         btn_company._icon = comp_icon
         btn_company.pack(fill="x")
 
-        # Bouton Produits
         btn_products = tk.Button(
             self.sidebar,
             text=" Produits",
@@ -347,7 +351,6 @@ class DashboardApp(tk.Tk):
         btn_products._icon = prod_icon
         btn_products.pack(fill="x")
 
-        # Bouton Ordres de Fabrication
         btn_orders = tk.Button(
             self.sidebar,
             text=" Ordres Fab",
@@ -370,33 +373,74 @@ class DashboardApp(tk.Tk):
         self.content_frame.pack(side="right", fill="both", expand=True)
 
         # Création des pages (HomePage, CompanyPage, ProductsPage, OrdersPage)
-        # Note : ces classes doivent être définies dans votre fichier.
         self.frames = {}
         for PageClass in (HomePage, CompanyPage, ProductsPage, OrdersPage):
-            page = PageClass(self.content_frame, self)
-            self.frames[PageClass.__name__] = page
-            page.place(x=0, y=0, relwidth=1, relheight=1)
+            try:
+                page = PageClass(self.content_frame, self)
+                self.frames[PageClass.__name__] = page
+                page.place(x=0, y=0, relwidth=1, relheight=1)
+            except Exception as e:
+                print(f"Erreur lors de la création de la page {PageClass.__name__} : {e}")
 
-        # Afficher la page d'accueil par défaut
         self.show_frame("HomePage")
 
+        # Démarrer la surveillance de la connexion
+        self.check_connection()
+
     def on_profile_click(self):
-        """ Gère le clic sur le profil : affiche une boîte de dialogue pour déconnexion et montre si l'utilisateur est admin. """
         profile = self.odoo.get_user_profile()
-        is_admin = not profile.get("share", True)  
-        admin_text = "" if is_admin else "Utilisateur"
-        choix = messagebox.askquestion("Profil", f"{profile.get('name', 'Utilisateur')} {admin_text}\nVoulez-vous vous déconnecter ?")
-        if choix == 'yes':
-            self.destroy()
-            LoginPage(tk.Tk()).root.mainloop()
+        is_admin = not profile.get("share", True)  # Si share est False, l'utilisateur est admin
+        admin_text = "admin" if is_admin else "Utilisateur"
+        # Vérifier si la fenêtre existe avant d'afficher la boîte de dialogue
+        if self.winfo_exists():
+            choix = messagebox.askquestion(
+                "Profil",
+                f"{profile.get('name', 'Utilisateur')}\nStatut : {admin_text}\nVoulez-vous vous déconnecter ?"
+            )
+            if choix == 'yes':
+                self.destroy()
+                # Réafficher la page de connexion
+                LoginPage(tk.Tk()).root.mainloop()
 
     def show_frame(self, page_name):
-        """ Affiche la page demandée en la mettant au premier plan. """
         frame = self.frames.get(page_name)
         if frame:
             frame.tkraise()
         else:
             print(f"[DashboardApp] La page '{page_name}' n'existe pas.")
+
+    def check_connection(self):
+        try:
+            _ = self.odoo.get_company_info()
+        except Exception as e:
+            # Vérifier si la fenêtre est toujours active
+            if self.winfo_exists():
+                try:
+                    messagebox.showerror("Erreur de connexion", "La connexion à Odoo a été interrompue.\nL'application va tenter de se reconnecter.")
+                except tk.TclError:
+                    pass
+            self.try_reconnect()
+            return
+        self.after(10000, self.check_connection)
+
+    def try_reconnect(self):
+        try:
+            if self.odoo.connect():
+                if self.winfo_exists():
+                    try:
+                        messagebox.showinfo("Connexion rétablie", "La connexion à Odoo a été rétablie.")
+                    except tk.TclError:
+                        pass
+                self.check_connection()
+                return
+        except Exception as e:
+            print("Erreur lors de la reconnexion :", e)
+        self.after(5000, self.try_reconnect)
+        
+
+
+
+
 
 
 ##############################################################################
@@ -495,18 +539,60 @@ class HomePage(tk.Frame):
 
 
 class CompanyPage(tk.Frame):
-    """ F2 : Afficher la fiche Entreprise depuis Odoo. """
+    """ F2 : Afficher la fiche Entreprise depuis Odoo, avec le logo de la boîte. """
     def __init__(self, parent, app):
         super().__init__(parent, bg="#10142c")
         self.app = app
+
         tk.Label(self, text="Fiche Entreprise (F2)", bg="#10142c", fg="white",
                  font=("Arial", 18, "bold")).pack(pady=20)
+
+        # Bouton pour charger les infos
         btn = tk.Button(self, text="Afficher Infos", bg="#3047ff", fg="white",
                         font=("Arial", 12, "bold"), command=self.show_company)
         btn.pack(pady=10)
+
+        # Espace pour le logo
+        self.logo_label = tk.Label(self, bg="#10142c")
+        self.logo_label.pack(pady=10)
+
+        # Zone de texte pour les informations de l'entreprise
         self.info_label = tk.Label(self, text="", bg="#10142c", fg="white",
                                    font=("Arial", 12), justify="left")
         self.info_label.pack(pady=10)
+
+    def show_company(self):
+        info = self.app.odoo.get_company_info()
+        if not info:
+            messagebox.showwarning("Entreprise", "Impossible de récupérer la fiche entreprise.")
+            return
+
+        # Récupérer et afficher le logo (ici on utilise le champ "image_1920")
+        logo_data = info.get("image_1920")
+        if logo_data:
+            try:
+                import base64
+                from io import BytesIO
+                image_data = base64.b64decode(logo_data)
+                img = Image.open(BytesIO(image_data))
+                # Redimensionner le logo pour l'affichage (par exemple 150x150 pixels)
+                img = img.resize((150, 150), Image.Resampling.LANCZOS)
+                logo_photo = ImageTk.PhotoImage(img)
+                self.logo_label.config(image=logo_photo, text="")
+                self.logo_label.image = logo_photo  # conserver la référence
+            except Exception as e:
+                print("Erreur lors du chargement du logo:", e)
+                self.logo_label.config(text="Logo non disponible")
+        else:
+            self.logo_label.config(text="Logo non disponible")
+
+        # Afficher les autres informations
+        name = info.get('name', '')
+        street = info.get('street', '')
+        city = info.get('city', '')
+        phone = info.get('phone', '')
+        texte = f"Nom : {name}\nAdresse : {street}\nVille : {city}\nTéléphone : {phone}"
+        self.info_label.config(text=texte)
 
     def show_company(self):
         info = self.app.odoo.get_company_info()
@@ -653,21 +739,25 @@ class OrdersPage(tk.Frame):
         self.tree.bind("<Double-1>", self.on_double_click)
 
     def show_of(self):
-        for row in self.tree.get_children():
-            self.tree.delete(row)
-        state_label = self.selected_state.get()
-        state_value = self.state_options.get(state_label)
-        orders = self.app.odoo.get_manufacturing_orders(state_filter=state_value)
-        if not orders:
-            messagebox.showinfo("OF", "Aucun ordre trouvé.")
-            return
-        for of in orders:
-            name_of = of.get("name", "")
-            qty = of.get("product_qty", 0.0)
-            produced = of.get("qty_producing", 0.0)
-            state_of = of.get("state", "")
-            display_state = self.state_labels.get(state_of, state_of)
-            self.tree.insert("", tk.END, values=(name_of, qty, produced, display_state))
+        try:
+            for row in self.tree.get_children():
+                self.tree.delete(row)
+            state_label = self.selected_state.get()
+            state_value = self.state_options.get(state_label)
+            orders = self.app.odoo.get_manufacturing_orders(state_filter=state_value)
+            if not orders:
+                messagebox.showinfo("OF", "Aucun ordre trouvé.")
+                return
+            for of in orders:
+                name_of = of.get("name", "")
+                qty = of.get("product_qty", 0.0)
+                produced = of.get("qty_producing", 0.0)
+                state_of = of.get("state", "")
+                display_state = self.state_labels.get(state_of, state_of)
+                self.tree.insert("", tk.END, values=(name_of, qty, produced, display_state))
+        except Exception as e:
+            messagebox.showerror("Erreur de connexion", "La connexion à Odoo a été interrompue.")
+            self.app.try_reconnect()  
 
     def on_double_click(self, event):
         selected = self.tree.selection()
@@ -688,7 +778,7 @@ class OrderDetailsWindow(tk.Toplevel):
         self.app = app
         self.order_details = order_details
         self.title("Détails de l'OF")
-        self.geometry("400x300")
+        self.geometry("500x400")
         
         tk.Label(self, text=f"OF : {order_details.get('name', '')}",
                  font=("Arial", 16, "bold")).pack(pady=10)
@@ -700,8 +790,28 @@ class OrderDetailsWindow(tk.Toplevel):
         tk.Entry(self, textvariable=self.qty_var, font=("Arial", 12)).pack(pady=5)
         
         move_ids = order_details.get("move_raw_ids", [])
-        tk.Label(self, text=f"Nombre de composants : {len(move_ids)}",
-                 font=("Arial", 12)).pack(pady=5)
+        if not move_ids:
+            tk.Label(self, text="Aucun composant défini pour cet OF.",
+                     font=("Arial", 12), fg="red").pack(pady=5)
+        else:
+            try:
+                move_details = self.app.odoo.models.execute_kw(
+                    self.app.odoo.db, self.app.odoo.uid, self.app.odoo.pwd,
+                    'stock.move', 'read',
+                    [move_ids],
+                    {'fields': ['name', 'product_uom_qty', 'quantity_done']}
+                )
+                tk.Label(self, text="Composants :", font=("Arial", 12, "bold")).pack(pady=5)
+                for move in move_details:
+                    name = move.get("name", "N/A")
+                    qty_needed = move.get("product_uom_qty", 0)
+                    qty_done = move.get("quantity_done", 0)
+                    tk.Label(self, text=f"- {name}: {qty_done} / {qty_needed}",
+                             font=("Arial", 12)).pack(anchor="w", padx=20, pady=2)
+            except Exception as e:
+                tk.Label(self, text="Erreur lors de la récupération des composants.",
+                         font=("Arial", 12), fg="red").pack(pady=5)
+                print("Erreur get_move_details:", e)
         
         tk.Button(self, text="Valider la commande", font=("Arial", 12, "bold"),
                   bg="#3047ff", fg="white", command=self.validate_order).pack(pady=20)
@@ -721,13 +831,20 @@ class OrderDetailsWindow(tk.Toplevel):
             messagebox.showerror("Erreur", f"Impossible de mettre à jour l'OF '{mo_name}'.")
 
 
+
 ##############################################################################
 #                           Point d'entrée (main)                            #
 ##############################################################################
 def main():
-    root = tk.Tk()
-    LoginPage(root)
-    root.mainloop()
+    try:
+        root = tk.Tk()
+        LoginPage(root)
+        root.mainloop()
+    except KeyboardInterrupt:
+        print("Interruption par l'utilisateur.")
+        # Ici, vous pouvez effectuer des opérations de nettoyage si nécessaire.
 
 if __name__ == '__main__':
     main()
+
+

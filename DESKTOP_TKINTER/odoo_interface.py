@@ -66,7 +66,7 @@ class IF_Odoo:
                 self.db, self.uid, self.pwd,
                 'res.company', 'search_read',
                 [[]],
-                {'fields': ['name', 'street', 'city', 'phone'], 'limit': 1}
+                {'fields': ['name', 'street', 'city', 'phone' ], 'limit': 1}
             )
             return comps[0] if comps else {}
         except Exception as e:
