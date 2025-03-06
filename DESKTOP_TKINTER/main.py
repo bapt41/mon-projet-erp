@@ -1,4 +1,4 @@
-#06/03/2025
+#06/03/2025 16h45
 #!/usr/bin/env python3
 import os
 import tkinter as tk
@@ -572,8 +572,8 @@ class CompanyPage(tk.Frame):
         self.info_label.pack(pady=10)
 
     def show_company(self):
-        # Chargement du logo depuis un fichier fixe
-        logo_path = "/home/user/erp/mon-projet-erp/DESKTOP_TKINTER/images/Logo BikeLab.jpg"
+        # Chargement du logo 
+        logo_path = "C:\Users\NinoMarquet-Stirweld\Downloads\mon-projet-erp-main\mon-projet-erp-main\DESKTOP_TKINTER\images\Logo BikeLab.jpg"
         if os.path.exists(logo_path):
             try:
                 img = Image.open(logo_path)

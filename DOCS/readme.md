@@ -118,7 +118,6 @@ portainer3556
 Une fois connecté, le tableau de bord affiche :
 - La date du jour et l'utilisateur connecté.
 - Des KPI clés (fiche entreprise, nombre de commandes, OF en cours).
-- Une section "Nouveautés" et "Tâches récentes".
 
 ### Gestion des Ordres de Fabrication
 - Utilisation d'un menu déroulant pour filtrer par état.
