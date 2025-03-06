@@ -2,8 +2,21 @@
 #!/usr/bin/env python3
 import os
 import tkinter as tk
+import sys
 from tkinter import ttk, messagebox
 from PIL import Image, ImageTk
+
+def resource_path(relative_path):
+    """
+    Retourne le chemin absolu vers la ressource.
+    Utile pour accéder aux fichiers lorsqu'on utilise PyInstaller.
+    """
+    try:
+        # PyInstaller stocke temporairement les fichiers dans _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 from odoo_interface import IF_Odoo  # Votre interface vers Odoo
 
